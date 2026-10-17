@@ -127,13 +127,15 @@ const { error } = await sb.from('cart_items').insert(payload as any);    setAddi
         <div className="dh-shell dh-hero-grid">
           <div className="dh-hero-copy">
             <div className="dh-eyebrow"><span className="dh-eyebrow-icon"><Sparkles size={14} /></span>{t('المنصة الأولى والأقوى لطب الأسنان', 'The #1 Elite Dental Platform')}</div>
-            <h1>
-              {t('طوّر مهاراتك،', 'Build your skills,')}
-              <span className="dh-gradient-text">{t('وجهّز عيادتك بالكامل.', 'and equip your clinic.')}</span>
-            </h1>
-            <p className="dh-hero-description">
-              {t('نستثمر في أطباء المستقبل. دنتيفاي توفر لك بيئة متكاملة تجمع بين الكورسات التأسيسية القوية والأدوات المعتمدة، لتكون جاهز للعيادات الجامعية بكل احترافية.', 'Investing in the dentists of tomorrow. Dentify provides an integrated environment combining strong foundational courses with certified tools, getting you ready for university clinics with utmost professionalism.')}
-            </p>
+       <h1>
+  {t('رفيقك في', 'Your companion in')} <span className="dh-gradient-text">{t('كل خطوة.', 'every step.')}</span>
+</h1>
+<p className="dh-hero-description">
+  {t(
+    'منصة دنتيفاي صُممت بأيدي طلاب ولأجل الطلاب. نوفر لك الموارد الدراسية، المواد التعليمية، الخدمات الطلابية، ومستلزمات الأسنان الأساسية لتسهيل حياتك الجامعية وجعل التعلم أبسط.',
+    'Dentify is a student-focused platform created by students, for students. We provide study resources, educational materials, student services, and essential dental supplies to make university life easier and learning simpler.'
+  )}
+</p>
             <div className="dh-hero-actions">
               <Link href="/store" className="dh-button dh-button-primary">{t('تصفح المتجر', 'Browse store')}<Package size={19} /></Link>
               <Link href="/courses" className="dh-button dh-button-light">{t('استكشف الكورسات', 'Explore courses')}<ArrowUpLeft size={19} /></Link>
