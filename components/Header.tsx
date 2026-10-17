@@ -6,7 +6,7 @@ import { BookOpen, ShoppingCart, UserRound, Menu, X, LogOut, Globe, Trash2, Arro
 import { useApp } from './Providers';
 import { supabaseBrowser } from '@/lib/supabase/client';
 import { money } from '@/lib/utils';
-
+import myLogo from './logo.png';
 export default function Header() {
   const { user, profile, lang, setLang, t, toast, settings } = useApp();
   const [open, setOpen] = useState(false);
@@ -55,8 +55,8 @@ export default function Header() {
     <header className="header">
       <div className="nav-wrap">
         <Link href="/" className="brand" onClick={() => setOpen(false)}>
-          <span className="brand-mark" style={{ background: 'none', border: 'none' }}>
-  <img src="/logo.png" alt="Dentify Logo" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
+        <span className="brand-mark" style={{ background: 'none', border: 'none' }}>
+  <img src={myLogo.src} alt="Dentify Logo" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
 </span>
           <span><b>{brand}</b></span>
         </Link>
