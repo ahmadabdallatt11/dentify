@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import './globals.css';
+import './main.css';
 import {Providers} from '@/components/Providers';
 import Header from '@/components/Header';
 import Link from 'next/link';
