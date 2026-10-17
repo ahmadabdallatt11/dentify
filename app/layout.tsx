@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+// @ts-ignore — Next.js handles global CSS imports at build time.
 import './main.css';
 import {Providers} from '@/components/Providers';
 import Header from '@/components/Header';

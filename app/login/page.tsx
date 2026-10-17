@@ -1,13 +1,13 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import Link from 'next/link';
-import { ShieldCheck, Mail, Lock, ArrowRight, LoaderCircle } from 'lucide-react';
+import { ShieldCheck, Mail, Lock, LoaderCircle } from 'lucide-react';
 import { supabaseBrowser } from '@/lib/supabase/client';
 import { useApp } from '@/components/Providers';
 
-export default function LoginPage() {
+// فصلنا الكود جوا كمبوننت داخلي عشان فيرسل يرضى يغلفه
+function LoginContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const next = searchParams?.get('next') || '/profile';
@@ -51,14 +51,13 @@ export default function LoginPage() {
       }
     } 
     else if (mode === 'recovery') {
-      // إرسال رابط استعادة الباسورد
       const { error } = await sb.auth.resetPasswordForEmail(email, {
         redirectTo: `${window.location.origin}/reset-password`,
       });
       if (error) toast(error.message, 'error');
       else {
         toast(t('تم إرسال رابط استعادة كلمة المرور إلى بريدك', 'Password reset link sent to your email'), 'success');
-        setMode('login'); // نرجعه لصفحة اللوجن بعد ما يبعث الإيميل
+        setMode('login');
       }
     }
     
@@ -131,5 +130,14 @@ export default function LoginPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+// هاي الصفحة الرئيسية اللي غلفنا فيها الكود بـ Suspense
+export default function LoginPage() {
+  return (
+    <Suspense fallback={<div className="loading-page"><div className="spinner" /></div>}>
+      <LoginContent />
+    </Suspense>
   );
 }
