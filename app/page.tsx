@@ -127,8 +127,8 @@ const { error } = await sb.from('cart_items').insert(payload as any);    setAddi
         <div className="dh-shell dh-hero-grid">
           <div className="dh-hero-copy">
             <div className="dh-eyebrow"><span className="dh-eyebrow-icon"><Sparkles size={14} /></span>{t('المنصة الأولى والأقوى لطب الأسنان', 'The #1 Elite Dental Platform')}</div>
-       <h1>
-  {t('رفيقك في', 'Your companion in')} <span className="dh-gradient-text">{t('كل خطوة.', 'every step.')}</span>
+     <h1>
+  {t('صديقك طوال', 'Your friend throughout')} <span className="dh-gradient-text">{t('رحلتك.', 'your journey.')}</span>
 </h1>
 <p className="dh-hero-description">
   {t(
