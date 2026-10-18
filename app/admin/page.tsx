@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
-import { Activity, BookOpen, Check, Download, Edit3, ImagePlus, LayoutDashboard, LoaderCircle, Palette, Plus, Save, Search, ShieldCheck, Trash2, UploadCloud, Users, Wallet, X, Store, Package, FileText, DownloadCloud, TrendingUp, Truck, Printer } from 'lucide-react';
+import { Activity, BookOpen, Check, Download, Edit3, ImagePlus, LayoutDashboard, LoaderCircle, Palette, Plus, Save, Search, ShieldCheck, Trash2, UploadCloud, Users, Wallet, X, Store, Package, FileText, DownloadCloud, TrendingUp, Truck, Printer, MessageSquare, Mail } from 'lucide-react';
 import { supabaseBrowser } from '@/lib/supabase/client';
 import { money, publicImage, slugify } from '@/lib/utils';
 import { useApp } from '@/components/Providers';
@@ -15,6 +15,7 @@ const tabs = [
   ['assignments', 'Assignments'],
   ['payments', 'New Payments'], 
   ['orders', 'Orders & Tracking'], 
+  ['messages', 'Contact Messages'], // تبويب رسائل التواصل
   ['brand', 'Site customizer']
 ];
 
@@ -51,6 +52,7 @@ export default function AdminPage() {
   const [products, setProducts] = useState<any[]>([]);
   const [orders, setOrders] = useState<any[]>([]);
   const [assignments, setAssignments] = useState<any[]>([]);
+  const [messages, setMessages] = useState<any[]>([]); // حالة الرسائل الجديدة
   
   const [selectedCourse, setSelectedCourse] = useState('');
   const [receiptUrls, setReceiptUrls] = useState<Record<string, string>>({});
@@ -61,7 +63,7 @@ export default function AdminPage() {
   const [courseForm, setCourseForm] = useState<any>({ title_ar: '', title_en: '', slug: '', description_ar: '', description_en: '', price_jod: '0', is_published: false, sort_order: 0, image_path: '', instructor_name: '', visibility: 'public', target_email: '' });
   const [lessonForm, setLessonForm] = useState<any>({ title_ar: '', title_en: '', description_ar: '', description_en: '', video_path: '', duration_seconds: 0, sort_order: 0, is_preview: false });
   
-  // أضفنا brands و types لتهيئة الفورم
+  // أضفنا brands و types لتهيئة الفورم مع colors و sizes
   const [productForm, setProductForm] = useState<any>({ title_ar: '', title_en: '', slug: '', description_ar: '', description_en: '', price_jod: '0', stock_quantity: '0', category: '', is_published: false, image_path: '', colors: [], sizes: [], brands: [], types: [] });
   
   const [colorInput, setColorInput] = useState('');
@@ -78,12 +80,13 @@ export default function AdminPage() {
     if (!user || profile?.role !== 'admin') return;
     setBusy(true);
     const sb = supabaseBrowser();
-    const [u, c, p, o, a] = await Promise.all([
+    const [u, c, p, o, a, m] = await Promise.all([
       sb.from('profiles').select('*').not('email', 'like', '%@deleted.invalid').order('created_at', { ascending: false }),
       sb.from('courses').select('*').order('created_at', { ascending: false }),
       sb.from('products').select('*').order('created_at', { ascending: false }),
       sb.from('cliq_orders').select('*, profiles!cliq_orders_user_id_fkey(full_name,email), cliq_order_items(*, courses(title_ar,title_en,slug), products(title_ar,title_en))').order('created_at', { ascending: false }),
-      sb.from('assignment_requests').select('*, profiles(full_name, email, university)').order('created_at', { ascending: false })
+      sb.from('assignment_requests').select('*, profiles(full_name, email, university)').order('created_at', { ascending: false }),
+      sb.from('contact_messages').select('*').order('created_at', { ascending: false }) // استدعاء الرسائل
     ]);
     
     if (u.error) toast(u.error.message, 'error');
@@ -91,12 +94,14 @@ export default function AdminPage() {
     if (p.error) toast(p.error.message, 'error');
     if (o.error) toast(o.error.message, 'error');
     if (a.error) toast(a.error.message, 'error');
+    if (m.error) toast(m.error.message, 'error');
 
     setUsers(u.data || []);
     setCourses(c.data || []);
     setProducts(p.data || []);
     setOrders(o.data || []);
     setAssignments(a.data || []);
+    setMessages(m.data || []);
 
     setBrandForm({
       brand_name: String(settings.brand_name || 'Dentify').replaceAll('"', ''),
@@ -488,6 +493,18 @@ export default function AdminPage() {
     else { toast(t('تم تحديث حالة الطلب', 'Order status updated'), 'success'); await load(); }
   }
 
+  // دوال رسائل التواصل
+  async function updateMessageStatus(id: string, newStatus: string) {
+    const { error } = await supabaseBrowser().from('contact_messages').update({ status: newStatus }).eq('id', id);
+    if (error) toast(error.message, 'error'); else { toast(t('تم تحديث حالة الرسالة', 'Message status updated'), 'success'); await load(); }
+  }
+
+  async function deleteMessage(id: string) {
+    if (!confirm(t('هل أنت متأكد من حذف هذه الرسالة؟', 'Are you sure you want to delete this message?'))) return;
+    const { error } = await supabaseBrowser().from('contact_messages').delete().eq('id', id);
+    if (error) toast(error.message, 'error'); else { toast(t('تم حذف الرسالة', 'Message deleted'), 'success'); await load(); }
+  }
+
   // طباعة الفاتورة PDF
   function printInvoice(order: any) {
     const win = window.open('', '_blank');
@@ -598,11 +615,16 @@ export default function AdminPage() {
         <aside className="admin-side">
           {tabs.map(([id, label]) => (
             <button key={id} className={tab === id ? 'active' : ''} onClick={() => setTab(id)}>
-              {id === 'overview' ? <LayoutDashboard size={16}/> : id === 'users' ? <Users size={16}/> : id === 'courses' ? <BookOpen size={16}/> : id === 'products' ? <Store size={16}/> : id === 'assignments' ? <FileText size={16}/> : id === 'payments' ? <Wallet size={16}/> : id === 'orders' ? <Truck size={16}/> : <Palette size={16}/>}
-              <span>{t(({overview:'نظرة عامة', users:'المستخدمون', courses:'الكورسات والدروس', products:'المتجر والمنتجات', assignments:'طلبات الواجبات', payments:'طلبات جديدة', orders:'تتبع الفواتير والطلبات', brand:'تخصيص الموقع'} as any)[id], label)}</span>
+              {id === 'overview' ? <LayoutDashboard size={16}/> : id === 'users' ? <Users size={16}/> : id === 'courses' ? <BookOpen size={16}/> : id === 'products' ? <Store size={16}/> : id === 'assignments' ? <FileText size={16}/> : id === 'payments' ? <Wallet size={16}/> : id === 'orders' ? <Truck size={16}/> : id === 'messages' ? <MessageSquare size={16}/> : <Palette size={16}/>}
+              <span>{t(({overview:'نظرة عامة', users:'المستخدمون', courses:'الكورسات والدروس', products:'المتجر والمنتجات', assignments:'طلبات الواجبات', payments:'طلبات جديدة', orders:'تتبع الفواتير والطلبات', messages:'رسائل التواصل', brand:'تخصيص الموقع'} as any)[id], label)}</span>
               {id === 'payments' && orders.filter(o => o.status === 'pending').length > 0 && (
                 <span style={{background: '#ef4444', color: '#fff', borderRadius: '50px', padding: '2px 6px', fontSize: '0.7rem', marginLeft: 'auto', fontWeight: 'bold'}}>
                   {orders.filter(o => o.status === 'pending').length}
+                </span>
+              )}
+              {id === 'messages' && messages.filter(m => m.status === 'new').length > 0 && (
+                <span style={{background: '#ef4444', color: '#fff', borderRadius: '50px', padding: '2px 6px', fontSize: '0.7rem', marginLeft: 'auto', fontWeight: 'bold'}}>
+                  {messages.filter(m => m.status === 'new').length}
                 </span>
               )}
             </button>
@@ -794,6 +816,7 @@ export default function AdminPage() {
             <>
               <div className="section-head"><div><h2>{t('إدارة المتجر', 'Store management')}</h2></div><button className="btn btn-outline" onClick={() => { setEditingProduct(null); setProductForm({title_ar:'',title_en:'',slug:'',description_ar:'',description_en:'',price_jod:'0',stock_quantity:'0',category:'',is_published:false,image_path:'', colors:[], sizes:[], brands:[], types:[]}); }}><Plus size={16}/>{t('منتج جديد', 'New product')}</button></div>
               <div className="panel">
+                <h3 style={{marginTop:0}}>{editingProduct ? t('تعديل المنتج', 'Edit product') : t('بيانات المنتج', 'Product details')}</h3>
                 <form className="admin-form" onSubmit={saveProduct}>
                   <div className="field"><label>{t('اسم المنتج بالعربية', 'Arabic title')} *</label><input required value={productForm.title_ar} onChange={e => setProductForm((f:any) => ({...f, title_ar: e.target.value, slug: f.slug || slugify(e.target.value)}))}/></div>
                   <div className="field"><label>{t('اسم المنتج بالإنجليزية', 'English title')} *</label><input required value={productForm.title_en} onChange={e => setProductForm((f:any) => ({...f, title_en: e.target.value, slug: f.slug || slugify(e.target.value)}))}/></div>
@@ -802,7 +825,7 @@ export default function AdminPage() {
                   <div className="field"><label>{t('الكمية (المخزون)', 'Stock')} *</label><input type="number" min="0" required value={productForm.stock_quantity} onChange={e => setProductForm((f:any) => ({...f, stock_quantity: e.target.value}))}/></div>
                   <div className="field"><label>{t('التصنيف', 'Category')}</label><input value={productForm.category || ''} onChange={e => setProductForm((f:any) => ({...f, category: e.target.value}))} placeholder="Tools, Kits, etc."/></div>
                   
-                  {/* نظام الـ Tags للألوان والمقاسات والشركات والأنواع */}
+                  {/* نظام الـ Tags للعلامات التجارية (Brands) */}
                   <div className="field">
                     <label>{t('الشركات المصنعة (Brands)', 'Available Brands')}</label>
                     <div style={{display: 'flex', gap: 10}}>
@@ -818,6 +841,7 @@ export default function AdminPage() {
                     </div>
                   </div>
 
+                  {/* نظام الـ Tags للنوع والشكل (Types) */}
                   <div className="field">
                     <label>{t('النوع أو الشكل', 'Type / Variant')}</label>
                     <div style={{display: 'flex', gap: 10}}>
@@ -833,6 +857,7 @@ export default function AdminPage() {
                     </div>
                   </div>
 
+                  {/* نظام الـ Tags للألوان */}
                   <div className="field">
                     <label>{t('الألوان المتاحة', 'Available Colors')}</label>
                     <div style={{display: 'flex', gap: 10}}>
@@ -848,6 +873,7 @@ export default function AdminPage() {
                     </div>
                   </div>
 
+                  {/* نظام الـ Tags للمقاسات */}
                   <div className="field">
                     <label>{t('المقاسات المتاحة', 'Available Sizes')}</label>
                     <div style={{display: 'flex', gap: 10}}>
@@ -894,7 +920,6 @@ export default function AdminPage() {
             </>
           )}
 
-          {/* التبويب لطلبات الواجبات */}
           {tab === 'assignments' && (
             <>
               <div className="section-head">
@@ -975,7 +1000,6 @@ export default function AdminPage() {
             </>
           )}
 
-          {/* تبويب المدفوعات الجديدة (كليك) */}
           {tab === 'payments' && (
             <>
               <div className="section-head"><div><h2>{t('الطلبات المعلقة', 'New Payments')}</h2></div><button className="btn btn-outline" onClick={() => void load()}><Activity size={15}/>{t('تحديث', 'Refresh')}</button></div>
@@ -1002,7 +1026,6 @@ export default function AdminPage() {
             </>
           )}
 
-          {/* التبويب الجديد للطلبات المقبولة والفواتير */}
           {tab === 'orders' && (
             <>
               <div className="section-head">
@@ -1053,6 +1076,45 @@ export default function AdminPage() {
                         </button>
                       </div>
                     </div>
+                  ))}
+                </div>
+              )}
+            </>
+          )}
+
+          {tab === 'messages' && (
+            <>
+              <div className="section-head">
+                <div><h2>{t('رسائل التواصل', 'Contact Messages')}</h2><p>{t('رد على استفسارات الطلاب والزوار.', 'Reply to student and visitor inquiries.')}</p></div>
+                <button className="btn btn-outline" onClick={() => void load()} disabled={busy}><Activity size={15}/>{t('تحديث', 'Refresh')}</button>
+              </div>
+              {messages.length === 0 ? (
+                <div className="empty-state"><MessageSquare size={30}/><h3>{t('لا توجد رسائل', 'No messages')}</h3></div>
+              ) : (
+                <div className="admin-list">
+                  {messages.map(msg => (
+                    <article className="panel" key={msg.id} style={{ borderInlineStart: msg.status === 'new' ? '4px solid var(--primary)' : '1px solid var(--line)' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 10, flexWrap: 'wrap', gap: 10 }}>
+                        <div>
+                          <strong style={{ fontSize: 16 }}>{msg.name}</strong>
+                          <span style={{ fontSize: 12, color: 'var(--muted)', marginInlineStart: 10, display: 'inline-block' }}>{msg.email} {msg.phone ? `| ${msg.phone}` : ''}</span>
+                          <h4 style={{ margin: '8px 0 5px', color: 'var(--secondary)', fontSize: 15 }}>{msg.subject}</h4>
+                        </div>
+                        <span className={`status status-${msg.status === 'new' ? 'pending' : msg.status === 'replied' ? 'active' : 'student'}`} style={{ height: 'fit-content' }}>
+                          {msg.status === 'new' ? 'جديدة' : msg.status === 'replied' ? 'تم الرد' : 'مقروءة'}
+                        </span>
+                      </div>
+                      <p style={{ whiteSpace: 'pre-wrap', fontSize: 14, color: '#475569', background: '#f8fafc', padding: 15, borderRadius: 8 }}>{msg.message}</p>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 15, paddingTop: 15, borderTop: '1px solid var(--line)', flexWrap: 'wrap', gap: 10 }}>
+                        <small style={{ color: 'var(--muted)' }}>{new Date(msg.created_at).toLocaleString()}</small>
+                        <div className="row-actions">
+                          <a href={`mailto:${msg.email}?subject=RE: ${msg.subject}`} className="btn btn-primary" onClick={async () => { if(msg.status === 'new') { await supabaseBrowser().from('contact_messages').update({ status: 'read' }).eq('id', msg.id); load(); } }}><Mail size={15}/> {t('رد عبر الإيميل', 'Reply via Email')}</a>
+                          {msg.status === 'new' && <button className="btn btn-outline" onClick={async () => { await supabaseBrowser().from('contact_messages').update({ status: 'read' }).eq('id', msg.id); load(); }}><Check size={15}/> {t('تحديد كمقروءة', 'Mark as read')}</button>}
+                          {msg.status !== 'replied' && <button className="btn btn-outline" onClick={async () => { await supabaseBrowser().from('contact_messages').update({ status: 'replied' }).eq('id', msg.id); load(); }}><Check size={15}/> {t('تحديد كتم الرد', 'Mark as replied')}</button>}
+                          <button className="icon-button" onClick={async () => { if(confirm(t('حذف الرسالة نهائياً؟', 'Delete this message permanently?'))) { await supabaseBrowser().from('contact_messages').delete().eq('id', msg.id); load(); } }}><Trash2 size={14}/></button>
+                        </div>
+                      </div>
+                    </article>
                   ))}
                 </div>
               )}

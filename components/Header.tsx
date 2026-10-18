@@ -22,6 +22,7 @@ export default function Header() {
     { href: '/courses', label: t('الكورسات', 'Courses') },
     { href: '/store', label: t('المتجر', 'Store') },
     { href: '/assignments', label: t('حل الواجبات', 'Assignments') },
+    { href: '/contact', label: t('تواصل معنا', 'Contact Us') }, // الرابط الجديد
     { href: '/profile', label: t('حسابي', 'My profile') },
   ];
 

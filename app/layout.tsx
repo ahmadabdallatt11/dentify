@@ -25,6 +25,8 @@ export default function RootLayout({children}:{children:React.ReactNode}){
                 <Link href="/#courses">Courses</Link>
                 <Link href="/profile">My learning</Link>
                 <Link href="/admin">Admin</Link>
+                <Link href="/contact">Contact Us</Link>
+
 <a href="https://www.instagram.com/dentify0?vrfl=MXE4eTZwbjlrOHNlNA==" target="_blank" rel="noopener noreferrer" style={{ display: 'inline-flex', alignItems: 'center' }} aria-label="Instagram Dentify">
   <Instagram size={20} />
 </a>
