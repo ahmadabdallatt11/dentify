@@ -21,10 +21,10 @@ export default function CartPage() {
       setLoading(false);
       return;
     }
-    // سحب الكورسات والمنتجات معاً
+    // سحب الكورسات والمنتجات وخيارات الألوان والأنواع المحفوظة
     const {data, error} = await supabaseBrowser()
       .from('cart_items')
-      .select('id, quantity, course_id, product_id, created_at, courses(*), products(*)')
+      .select('id, quantity, course_id, product_id, created_at, selected_color, selected_size, selected_brand, selected_type, courses(*), products(*)')
       .eq('user_id', user.id)
       .order('created_at', {ascending: false});
       
@@ -66,7 +66,6 @@ export default function CartPage() {
     if (error) {
       toast(error.message, 'error');
     } else {
-      // تحديث الكمية بالواجهة بدون ريلود كامل
       setItems(prev => prev.map(item => item.id === id ? { ...item, quantity: newQty } : item));
       window.dispatchEvent(new Event('cart-updated'));
     }
@@ -124,7 +123,7 @@ export default function CartPage() {
               {items.map(item => {
                 const isCourse = !!item.course_id;
                 const c = isCourse ? item.courses : item.products;
-                if (!c) return null; // في حال كان المنتج أو الكورس محذوف
+                if (!c) return null;
                 
                 return (
                   <div className="cart-item" key={item.id} style={{display: 'flex', alignItems: 'center', gap: '15px', padding: '15px', background: '#f8fafc', borderRadius: '16px', border: '1px solid #f1f5f9'}}>
@@ -143,6 +142,17 @@ export default function CartPage() {
                         </span>
                       </div>
                       <h3 style={{margin: '0 0 5px', fontSize: '1.05rem'}}>{lang === 'ar' ? (c.title_ar || c.title_en) : (c.title_en || c.title_ar)}</h3>
+                      
+                      {/* عرض الخيارات (الألوان والأنواع) اللي اختارها الطالب بشكل مرتب */}
+                      {!isCourse && (item.selected_brand || item.selected_type || item.selected_color || item.selected_size) && (
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginBottom: '6px' }}>
+                          {item.selected_brand && <span style={{fontSize: '0.7rem', background: '#e2e8f0', padding: '2px 8px', borderRadius: '4px', color: '#475569'}}>{item.selected_brand}</span>}
+                          {item.selected_type && <span style={{fontSize: '0.7rem', background: '#e2e8f0', padding: '2px 8px', borderRadius: '4px', color: '#475569'}}>{item.selected_type}</span>}
+                          {item.selected_color && <span style={{fontSize: '0.7rem', background: '#e2e8f0', padding: '2px 8px', borderRadius: '4px', color: '#475569'}}>{item.selected_color}</span>}
+                          {item.selected_size && <span style={{fontSize: '0.7rem', background: '#e2e8f0', padding: '2px 8px', borderRadius: '4px', color: '#475569'}}>{item.selected_size}</span>}
+                        </div>
+                      )}
+
                       <strong className="price" style={{color: 'var(--secondary)'}}>{money(c.price_jod)}</strong>
                     </div>
 
@@ -151,7 +161,6 @@ export default function CartPage() {
                         <Trash2 size={16}/>
                       </button>
 
-                      {/* أزرار الكمية تظهر للمنتجات فقط */}
                       {!isCourse && (
                         <div style={{display: 'flex', alignItems: 'center', gap: '10px', background: '#fff', border: '1px solid #e2e8f0', borderRadius: '50px', padding: '2px'}}>
                           <button 

@@ -21,6 +21,8 @@ export default function ProductDetailsPage() {
   
   const [selectedColor, setSelectedColor] = useState<string>('');
   const [selectedSize, setSelectedSize] = useState<string>('');
+  const [selectedBrand, setSelectedBrand] = useState<string>(''); // جديد
+  const [selectedType, setSelectedType] = useState<string>('');   // جديد
   const [qty, setQty] = useState(1);
 
   useEffect(() => {
@@ -30,8 +32,10 @@ export default function ProductDetailsPage() {
       .then(({ data }) => {
         if (data) {
           setProduct(data);
-          if (data.colors?.length > 0) setSelectedColor(''); // إجباري يختار
-          if (data.sizes?.length > 0) setSelectedSize(''); // إجباري يختار
+          if (data.colors?.length > 0) setSelectedColor(''); 
+          if (data.sizes?.length > 0) setSelectedSize(''); 
+          if (data.brands?.length > 0) setSelectedBrand(''); // جديد
+          if (data.types?.length > 0) setSelectedType('');   // جديد
           setLoading(false);
         } else {
           supabaseBrowser().from('products').select('*').eq('id', decodedSlug).eq('is_published', true).maybeSingle()
@@ -40,6 +44,8 @@ export default function ProductDetailsPage() {
                 setProduct(idData);
                 if (idData.colors?.length > 0) setSelectedColor('');
                 if (idData.sizes?.length > 0) setSelectedSize('');
+                if (idData.brands?.length > 0) setSelectedBrand(''); // جديد
+                if (idData.types?.length > 0) setSelectedType('');   // جديد
               } else setNotFound(true);
               setLoading(false);
             });
@@ -53,6 +59,16 @@ export default function ProductDetailsPage() {
       router.push('/login?next=/store/' + slug);
       return;
     }
+    
+    // التحقق من أن الطالب اختار الخيارات الإجبارية إذا كانت متوفرة
+    if (product.brands?.length > 0 && !selectedBrand) {
+      toast(t('الرجاء تحديد الشركة المصنعة أولاً', 'Please select a brand first'), 'error');
+      return;
+    }
+    if (product.types?.length > 0 && !selectedType) {
+      toast(t('الرجاء تحديد النوع/الشكل أولاً', 'Please select a type first'), 'error');
+      return;
+    }
     if (product.colors?.length > 0 && !selectedColor) {
       toast(t('الرجاء تحديد اللون أولاً', 'Please select a color first'), 'error');
       return;
@@ -61,11 +77,19 @@ export default function ProductDetailsPage() {
       toast(t('الرجاء تحديد المقاس أولاً', 'Please select a size first'), 'error');
       return;
     }
+
     setAdding(true);
     const { error } = await supabaseBrowser().from('cart_items').insert({
-      user_id: user.id, product_id: product.id, quantity: qty, selected_color: selectedColor || null, selected_size: selectedSize || null
+      user_id: user.id, 
+      product_id: product.id, 
+      quantity: qty, 
+      selected_color: selectedColor || null, 
+      selected_size: selectedSize || null,
+      selected_brand: selectedBrand || null, // جديد
+      selected_type: selectedType || null    // جديد
     });
     setAdding(false);
+    
     if (error) toast(error.message, 'error');
     else {
       toast(t('تمت الإضافة للسلة بنجاح', 'Added to cart successfully'), 'success');
@@ -106,6 +130,29 @@ export default function ProductDetailsPage() {
 
           <p style={{ color: 'var(--muted)', lineHeight: 1.8, fontSize: 15, whiteSpace: 'pre-wrap', marginBottom: 35 }}>{description}</p>
           
+          {/* قائمة الشركات */}
+          {product.brands && product.brands.length > 0 && (
+            <div style={{ marginBottom: 20 }}>
+              <strong style={{ display: 'block', marginBottom: 10, fontSize: 14 }}>{t('الشركة المصنعة:', 'Select Brand:')}</strong>
+              <select value={selectedBrand} onChange={e => setSelectedBrand(e.target.value)} style={{ width: '100%', padding: '14px', borderRadius: 12, border: '2px solid var(--line)', background: '#fff', fontSize: 15, outline: 'none' }}>
+                <option value="" disabled>{t('اختر الشركة...', 'Choose brand...')}</option>
+                {product.brands.map((b: string) => <option key={b} value={b}>{b}</option>)}
+              </select>
+            </div>
+          )}
+
+          {/* قائمة الأنواع/الأشكال */}
+          {product.types && product.types.length > 0 && (
+            <div style={{ marginBottom: 20 }}>
+              <strong style={{ display: 'block', marginBottom: 10, fontSize: 14 }}>{t('النوع / الشكل:', 'Select Type:')}</strong>
+              <select value={selectedType} onChange={e => setSelectedType(e.target.value)} style={{ width: '100%', padding: '14px', borderRadius: 12, border: '2px solid var(--line)', background: '#fff', fontSize: 15, outline: 'none' }}>
+                <option value="" disabled>{t('اختر النوع...', 'Choose type...')}</option>
+                {product.types.map((ty: string) => <option key={ty} value={ty}>{ty}</option>)}
+              </select>
+            </div>
+          )}
+
+          {/* قائمة الألوان */}
           {product.colors && product.colors.length > 0 && (
             <div style={{ marginBottom: 20 }}>
               <strong style={{ display: 'block', marginBottom: 10, fontSize: 14 }}>{t('اللون المطلوب:', 'Select Color:')}</strong>
@@ -116,6 +163,7 @@ export default function ProductDetailsPage() {
             </div>
           )}
           
+          {/* قائمة المقاسات */}
           {product.sizes && product.sizes.length > 0 && (
             <div style={{ marginBottom: 30 }}>
               <strong style={{ display: 'block', marginBottom: 10, fontSize: 14 }}>{t('المقاس المطلوب:', 'Select Size:')}</strong>
