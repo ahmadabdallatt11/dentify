@@ -13,12 +13,22 @@ export default function CoursesPage(){
   const [adding,setAdding]=useState<string|null>(null);
 
   useEffect(()=>{
+    // نجيب الكورسات المنشورة
     supabaseBrowser().from('courses').select('*').eq('is_published',true).order('sort_order',{ascending:true})
       .then(({data})=>{
-        setCourses(data||[]);
+        if(data) {
+          // فلترة الكورسات: إما عامة (public)، أو خاصة (private) وتطابق إيميل المستخدم الحالي
+          const filteredCourses = data.filter(c => 
+            c.visibility === 'public' || 
+            (c.visibility === 'private' && user && c.target_email === user.email)
+          );
+          setCourses(filteredCourses);
+        } else {
+          setCourses([]);
+        }
         setLoading(false);
       });
-  },[]);
+  },[user]);
 
   async function addToCart(item: any){
     if(!user){
@@ -57,7 +67,10 @@ export default function CoursesPage(){
             <article className="course-card" key={c.id}>
               <Link href={`/courses/${encodeURIComponent(c.slug)}`} className="course-cover">
                 {c.image_path ? <img src={publicImage(c.image_path)} alt={c.title_en} loading="lazy"/> : <GraduationCap size={54} color="var(--primary)"/>}
-                <span className="cover-badge">{t('كورس','COURSE')}</span>
+                {/* تمييز الكورس البرايفت للمستخدم */}
+                <span className="cover-badge" style={c.visibility === 'private' ? {background: 'var(--primary)', color: 'white'} : {}}>
+                  {c.visibility === 'private' ? t('كورس خاص', 'PRIVATE') : t('كورس', 'COURSE')}
+                </span>
               </Link>
               <div className="course-body">
                 <h3><Link href={`/courses/${encodeURIComponent(c.slug)}`}>{lang==='ar'?(c.title_ar||c.title_en):(c.title_en||c.title_ar)}</Link></h3>

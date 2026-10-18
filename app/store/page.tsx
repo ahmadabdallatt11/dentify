@@ -1,12 +1,15 @@
 'use client';
 import {useEffect,useState,useMemo} from 'react';
+import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import {Package,ShoppingCart,Store} from 'lucide-react';
 import {supabaseBrowser} from '@/lib/supabase/client';
 import {publicImage,money} from '@/lib/utils';
 import {useApp} from '@/components/Providers';
 
 export default function StorePage(){
-  const {lang,t,user,toast,profile}=useApp();
+  const {lang,t,user,toast}=useApp();
+  const router = useRouter();
   const [products,setProducts]=useState<any[]>([]);
   const [loading,setLoading]=useState(true);
   const [adding,setAdding]=useState<string|null>(null);
@@ -30,19 +33,29 @@ export default function StorePage(){
     ? products 
     : products.filter(p => p.category === activeCategory);
 
-  async function addToCart(item: any){
-    if(!user){
+  async function handleAddToCartClick(item: any) {
+    if (!user) {
       toast(t('سجّل الدخول أولاً لإضافة العناصر للسلة','Sign in to add this item to your cart'),'info');
-      location.href='/login?next=/cart';
+      router.push(`/login?next=/store/${encodeURIComponent(item.slug)}`);
       return;
     }
     if (item.stock_quantity < 1) {
       toast(t('عذراً، نفدت الكمية', 'Sorry, out of stock'), 'error');
       return;
     }
+    
+    // إذا المنتج إلو ألوان أو مقاسات، وديه ع صفحة المنتج عشان يختارهم
+    const hasColors = item.colors && item.colors.length > 0;
+    const hasSizes = item.sizes && item.sizes.length > 0;
+    if (hasColors || hasSizes) {
+      router.push(`/store/${encodeURIComponent(item.slug)}`);
+      return;
+    }
+
     setAdding(item.id);
     const { error } = await supabaseBrowser().from('cart_items').insert({ user_id: user.id, product_id: item.id, quantity: 1 });
     setAdding(null);
+    
     if(error){
       if (error.code === '23505') toast(t('العنصر موجود بالفعل في السلة', 'Item is already in cart'), 'error');
       else toast(error.message,'error');
@@ -88,32 +101,39 @@ export default function StorePage(){
           <div className="course-grid">
             {filteredProducts.map(p => (
               <article className="course-card" key={p.id}>
-                <div className="course-cover">
-                  {p.image_path ? <img src={getProductImg(p.image_path)} alt={p.title_en} loading="lazy"/> : <Package size={54} color="var(--primary)"/>}
+                <Link href={`/store/${encodeURIComponent(p.slug)}`} className="course-cover" style={{display: 'block'}}>
+                  {p.image_path ? <img src={getProductImg(p.image_path)} alt={p.title_en} loading="lazy" style={{objectFit: 'contain', padding: 10}}/> : <Package size={54} color="var(--primary)"/>}
                   <span className="cover-badge" style={{background: 'var(--primary)'}}>{p.category || t('منتج','Product')}</span>
-                </div>
+                </Link>
                 <div className="course-body">
-                  <h3>{lang==='ar'?(p.title_ar||p.title_en):(p.title_en||p.title_ar)}</h3>
+                  <h3><Link href={`/store/${encodeURIComponent(p.slug)}`}>{lang==='ar'?(p.title_ar||p.title_en):(p.title_en||p.title_ar)}</Link></h3>
                   <p style={{fontSize: 13, color: 'var(--muted)', marginTop: 8}}>{lang==='ar'?(p.description_ar||p.description_en):(p.description_en||p.description_ar)}</p>
+                  
+                  {((p.colors && p.colors.length > 0) || (p.sizes && p.sizes.length > 0)) && (
+                    <small style={{display: 'block', color: 'var(--primary)', fontWeight: 'bold', fontSize: 10, marginBottom: 5}}>
+                      {t('خيارات متعددة متاحة', 'Multiple options available')}
+                    </small>
+                  )}
+
                   <div className="course-meta" style={{marginTop: 'auto', paddingTop: 15}}>
                     <div><strong style={{fontSize: 18}}>{money(p.price_jod)}</strong></div>
                     <div>
-                      {profile?.role === 'admin' ? (
-                        <small style={{color: p.stock_quantity > 0 ? 'var(--primary)' : 'red', fontWeight: 'bold'}}>{t('المخزون:','Stock:')} {p.stock_quantity}</small>
-                      ) : (
-                        <small style={{color: p.stock_quantity > 0 ? 'var(--primary)' : 'red', fontWeight: 'bold'}}>
-                          {p.stock_quantity > 0 ? t('متوفر','In Stock') : t('نفدت الكمية','Out of stock')}
-                        </small>
-                      )}
+                      {/* التعديل صار هون: إخفاء الرقم كلياً وإظهار الحالة بس */}
+                      <small style={{color: p.stock_quantity > 0 ? 'var(--primary)' : 'red', fontWeight: 'bold'}}>
+                        {p.stock_quantity > 0 ? t('متوفر','In Stock') : t('نفدت الكمية','Out of stock')}
+                      </small>
                     </div>
                   </div>
-                  <div className="card-actions" style={{gridTemplateColumns: '1fr', marginTop: 15}}>
+                  
+                  <div className="card-actions" style={{marginTop: 15, display: 'flex', gap: 8}}>
+                    <Link className="btn btn-outline" href={`/store/${encodeURIComponent(p.slug)}`} style={{flex: 1, padding: 10}}>{t('التفاصيل','Details')}</Link>
+                    
                     {p.stock_quantity > 0 ? (
-                      <button className="btn btn-primary" disabled={adding===p.id} onClick={()=>addToCart(p)}>
+                      <button className="btn btn-primary" style={{flex: 1, padding: 10}} disabled={adding===p.id} onClick={()=>handleAddToCartClick(p)}>
                         {adding===p.id ? <div className="spinner" style={{width:15,height:15,borderWidth:2}}></div> : <><ShoppingCart size={16}/> {t('أضف للسلة','Add to cart')}</>}
                       </button>
                     ) : (
-                      <button className="btn btn-outline" style={{borderColor: 'red', color: 'red'}} disabled>{t('نفدت الكمية','Out of stock')}</button>
+                      <button className="btn btn-outline" style={{flex: 1, borderColor: 'red', color: 'red', padding: 10}} disabled>{t('نفد','Out')}</button>
                     )}
                   </div>
                 </div>

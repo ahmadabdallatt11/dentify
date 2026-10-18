@@ -57,9 +57,10 @@ export default function AdminPage() {
   const [replyDrafts, setReplyDrafts] = useState<Record<string, { reply: string; status: 'completed' | 'rejected'; file: File | null }>>({});
   const [assignmentAction, setAssignmentAction] = useState<string | null>(null);
   
-  const [courseForm, setCourseForm] = useState<any>({ title_ar: '', title_en: '', slug: '', description_ar: '', description_en: '', price_jod: '0', is_published: false, sort_order: 0, image_path: '', instructor_name: '' });
+  const [courseForm, setCourseForm] = useState<any>({ title_ar: '', title_en: '', slug: '', description_ar: '', description_en: '', price_jod: '0', is_published: false, sort_order: 0, image_path: '', instructor_name: '', visibility: 'public', target_email: '' });
   const [lessonForm, setLessonForm] = useState<any>({ title_ar: '', title_en: '', description_ar: '', description_en: '', video_path: '', duration_seconds: 0, sort_order: 0, is_preview: false });
-  const [productForm, setProductForm] = useState<any>({ title_ar: '', title_en: '', slug: '', description_ar: '', description_en: '', price_jod: '0', stock_quantity: '0', category: '', is_published: false, image_path: '' });
+  // أضفنا colors و sizes للفورم
+  const [productForm, setProductForm] = useState<any>({ title_ar: '', title_en: '', slug: '', description_ar: '', description_en: '', price_jod: '0', stock_quantity: '0', category: '', is_published: false, image_path: '', colors: '', sizes: '' });
   
   const [editingCourse, setEditingCourse] = useState<string | null>(null);
   const [editingLesson, setEditingLesson] = useState<string | null>(null);
@@ -211,7 +212,9 @@ export default function AdminPage() {
       is_published: !!courseForm.is_published,
       sort_order: Number(courseForm.sort_order || 0),
       image_path: courseForm.image_path || null,
-      instructor_name: courseForm.instructor_name || null
+      instructor_name: courseForm.instructor_name || null,
+      visibility: courseForm.visibility || 'public',
+      target_email: courseForm.visibility === 'private' ? (courseForm.target_email || null) : null
     };
     const sb = supabaseBrowser();
     const result = editingCourse
@@ -221,7 +224,7 @@ export default function AdminPage() {
     if (result.error) toast(result.error.message, 'error');
     else {
       toast(t('تم حفظ الكورس', 'Course saved'), 'success');
-      setCourseForm({ title_ar: '', title_en: '', slug: '', description_ar: '', description_en: '', price_jod: '0', is_published: false, sort_order: 0, image_path: '', instructor_name: '' });
+      setCourseForm({ title_ar: '', title_en: '', slug: '', description_ar: '', description_en: '', price_jod: '0', is_published: false, sort_order: 0, image_path: '', instructor_name: '', visibility: 'public', target_email: '' });
       setEditingCourse(null);
       await load();
     }
@@ -256,6 +259,7 @@ export default function AdminPage() {
   async function saveProduct(e: React.FormEvent) {
     e.preventDefault();
     setBusy(true);
+    // تحويل النصوص المكتوبة (أزرق، أحمر) لمصفوفات جاهزة للحفظ بالداتا بيس
     const payload = {
       title_ar: productForm.title_ar,
       title_en: productForm.title_en,
@@ -266,7 +270,9 @@ export default function AdminPage() {
       stock_quantity: Number(productForm.stock_quantity || 0),
       category: productForm.category || null,
       is_published: !!productForm.is_published,
-      image_path: productForm.image_path || null
+      image_path: productForm.image_path || null,
+      colors: productForm.colors ? productForm.colors.split(',').map((c:string) => c.trim()).filter(Boolean) : [],
+      sizes: productForm.sizes ? productForm.sizes.split(',').map((s:string) => s.trim()).filter(Boolean) : []
     };
     const sb = supabaseBrowser();
     const result = editingProduct
@@ -276,7 +282,7 @@ export default function AdminPage() {
     if (result.error) toast(result.error.message, 'error');
     else {
       toast(t('تم حفظ المنتج', 'Product saved'), 'success');
-      setProductForm({ title_ar: '', title_en: '', slug: '', description_ar: '', description_en: '', price_jod: '0', stock_quantity: '0', category: '', is_published: false, image_path: '' });
+      setProductForm({ title_ar: '', title_en: '', slug: '', description_ar: '', description_en: '', price_jod: '0', stock_quantity: '0', category: '', is_published: false, image_path: '', colors: '', sizes: '' });
       setEditingProduct(null);
       await load();
     }
@@ -551,7 +557,10 @@ export default function AdminPage() {
             <>
               <div className="section-head">
                 <div><h2>{t('إدارة الكورسات', 'Course management')}</h2></div>
-                <button className="btn btn-outline" onClick={() => { setEditingCourse(null); setCourseForm({title_ar:'',title_en:'',slug:'',description_ar:'',description_en:'',price_jod:'0',is_published:false,sort_order:courses.length,image_path:'',instructor_name:''}); }}><Plus size={16}/>{t('كورس جديد', 'New course')}</button>
+                <button className="btn btn-outline" onClick={() => { 
+                  setEditingCourse(null); 
+                  setCourseForm({title_ar:'',title_en:'',slug:'',description_ar:'',description_en:'',price_jod:'0',is_published:false,sort_order:courses.length,image_path:'',instructor_name:'',visibility:'public',target_email:''}); 
+                }}><Plus size={16}/>{t('كورس جديد', 'New course')}</button>
               </div>
               <div className="panel">
                 <h3 style={{marginTop:0}}>{editingCourse ? t('تعديل الكورس', 'Edit course') : t('بيانات الكورس', 'Course details')}</h3>
@@ -561,6 +570,23 @@ export default function AdminPage() {
                   <div className="field"><label>{t('اسم المدرّس', 'Instructor')}</label><input value={courseForm.instructor_name||''} onChange={e => setCourseForm((f:any) => ({...f, instructor_name: e.target.value}))}/></div>
                   <div className="field"><label>Slug</label><input required value={courseForm.slug} onChange={e => setCourseForm((f:any) => ({...f, slug: slugify(e.target.value)}))}/></div>
                   <div className="field"><label>{t('السعر بالدينار', 'Price in JOD')} *</label><input type="number" min="0" step="0.01" required value={courseForm.price_jod} onChange={e => setCourseForm((f:any) => ({...f, price_jod: e.target.value}))}/></div>
+                  
+                  <div className="field">
+                    <label>{t('ظهور الكورس (الخصوصية)', 'Course Visibility')}</label>
+                    <select value={courseForm.visibility || 'public'} onChange={e => setCourseForm((f:any) => ({...f, visibility: e.target.value}))}>
+                      <option value="public">{t('عام للجميع (يظهر في المكتبة)', 'Public (Visible to all)')}</option>
+                      <option value="unlisted">{t('مخفي برابط (لا يظهر بالمكتبة)', 'Unlisted (Hidden link)')}</option>
+                      <option value="private">{t('خاص (لطالب محدد فقط)', 'Private (Specific student)')}</option>
+                    </select>
+                  </div>
+                  
+                  {courseForm.visibility === 'private' && (
+                    <div className="field">
+                      <label>{t('إيميل الطالب المخصص', 'Target Student Email')} *</label>
+                      <input type="email" required placeholder="student@example.com" value={courseForm.target_email || ''} onChange={e => setCourseForm((f:any) => ({...f, target_email: e.target.value}))}/>
+                    </div>
+                  )}
+
                   <div className="field full"><label>{t('الوصف بالعربية', 'Arabic description')}</label><textarea value={courseForm.description_ar} onChange={e => setCourseForm((f:any) => ({...f, description_ar: e.target.value}))}/></div>
                   <div className="field full"><label>{t('الوصف بالإنجليزية', 'English description')}</label><textarea value={courseForm.description_en} onChange={e => setCourseForm((f:any) => ({...f, description_en: e.target.value}))}/></div>
                   <div className="field">
@@ -574,7 +600,7 @@ export default function AdminPage() {
                   </div>
                   <div className="field full" style={{display:'flex',gap:9}}>
                     <button className="btn btn-primary" type="submit" disabled={busy}><Save size={15}/>{t('حفظ الكورس', 'Save course')}</button>
-                    {editingCourse && <button className="btn btn-outline" type="button" onClick={() => { setEditingCourse(null); setCourseForm({title_ar:'',title_en:'',slug:'',description_ar:'',description_en:'',price_jod:'0',is_published:false,sort_order:0,image_path:''}); }}><X size={15}/>{t('إلغاء', 'Cancel')}</button>}
+                    {editingCourse && <button className="btn btn-outline" type="button" onClick={() => { setEditingCourse(null); setCourseForm({title_ar:'',title_en:'',slug:'',description_ar:'',description_en:'',price_jod:'0',is_published:false,sort_order:0,image_path:'',instructor_name:'',visibility:'public',target_email:''}); }}><X size={15}/>{t('إلغاء', 'Cancel')}</button>}
                   </div>
                 </form>
               </div>
@@ -583,7 +609,12 @@ export default function AdminPage() {
                   <div className="admin-row" key={c.id}>
                     <div style={{display:'flex',alignItems:'center',gap:12,minWidth:0}}>
                       <div className="cart-thumb" style={{width:58,height:52,flexShrink:0}}>{c.image_path && publicImage(c.image_path) ? <img src={publicImage(c.image_path)} alt=""/> : <BookOpen size={21}/>}</div>
-                      <div><strong>{c.title_en} / {c.title_ar}</strong><small>{money(c.price_jod)} · {c.is_published ? 'Published' : 'Draft'}</small></div>
+                      <div>
+                        <strong>{c.title_en} / {c.title_ar}</strong>
+                        <small style={{display: 'block', color: c.visibility === 'private' ? 'var(--primary)' : c.visibility === 'unlisted' ? '#ef4444' : 'var(--muted)'}}>
+                          {c.is_published ? 'Published' : 'Draft'} · {c.visibility === 'private' ? `Private (${c.target_email})` : c.visibility === 'unlisted' ? 'Unlisted' : 'Public'}
+                        </small>
+                      </div>
                     </div>
                     <div className="row-actions">
                       <button className="btn btn-outline" onClick={() => { setSelectedCourse(c.id); setEditingCourse(c.id); setCourseForm({...c, price_jod: String(c.price_jod)}); }}><Edit3 size={13}/>{t('تعديل', 'Edit')}</button>
@@ -638,7 +669,7 @@ export default function AdminPage() {
 
           {tab === 'products' && (
             <>
-              <div className="section-head"><div><h2>{t('إدارة المتجر', 'Store management')}</h2></div><button className="btn btn-outline" onClick={() => { setEditingProduct(null); setProductForm({title_ar:'',title_en:'',slug:'',description_ar:'',description_en:'',price_jod:'0',stock_quantity:'0',category:'',is_published:false,image_path:''}); }}><Plus size={16}/>{t('منتج جديد', 'New product')}</button></div>
+              <div className="section-head"><div><h2>{t('إدارة المتجر', 'Store management')}</h2></div><button className="btn btn-outline" onClick={() => { setEditingProduct(null); setProductForm({title_ar:'',title_en:'',slug:'',description_ar:'',description_en:'',price_jod:'0',stock_quantity:'0',category:'',is_published:false,image_path:'', colors:'', sizes:''}); }}><Plus size={16}/>{t('منتج جديد', 'New product')}</button></div>
               <div className="panel">
                 <h3 style={{marginTop:0}}>{editingProduct ? t('تعديل المنتج', 'Edit product') : t('بيانات المنتج', 'Product details')}</h3>
                 <form className="admin-form" onSubmit={saveProduct}>
@@ -648,6 +679,19 @@ export default function AdminPage() {
                   <div className="field"><label>{t('التصنيف', 'Category')}</label><input value={productForm.category || ''} onChange={e => setProductForm((f:any) => ({...f, category: e.target.value}))} placeholder="Tools, Kits, etc."/></div>
                   <div className="field"><label>{t('السعر بالدينار', 'Price in JOD')} *</label><input type="number" min="0" step="0.01" required value={productForm.price_jod} onChange={e => setProductForm((f:any) => ({...f, price_jod: e.target.value}))}/></div>
                   <div className="field"><label>{t('الكمية (المخزون)', 'Stock')} *</label><input type="number" min="0" required value={productForm.stock_quantity} onChange={e => setProductForm((f:any) => ({...f, stock_quantity: e.target.value}))}/></div>
+                  
+                  {/* الخانات الجديدة للألوان والمقاسات */}
+                  <div className="field">
+                    <label>{t('الألوان المتاحة (مفصولة بفاصلة)', 'Available Colors (comma separated)')}</label>
+                    <input value={productForm.colors || ''} onChange={e => setProductForm((f:any) => ({...f, colors: e.target.value}))} placeholder="أزرق, أحمر, أخضر" />
+                    <small style={{color: 'var(--muted)', fontSize: 10}}>{t('اتركه فارغاً إذا لم يوجد', 'Leave empty if none')}</small>
+                  </div>
+                  <div className="field">
+                    <label>{t('المقاسات المتاحة (مفصولة بفاصلة)', 'Available Sizes (comma separated)')}</label>
+                    <input value={productForm.sizes || ''} onChange={e => setProductForm((f:any) => ({...f, sizes: e.target.value}))} placeholder="S, M, L, XL" />
+                    <small style={{color: 'var(--muted)', fontSize: 10}}>{t('اتركه فارغاً إذا لم يوجد', 'Leave empty if none')}</small>
+                  </div>
+
                   <div className="field full"><label>{t('الوصف بالعربية', 'Arabic description')}</label><textarea value={productForm.description_ar} onChange={e => setProductForm((f:any) => ({...f, description_ar: e.target.value}))}/></div>
                   <div className="field full"><label>{t('الوصف بالإنجليزية', 'English description')}</label><textarea value={productForm.description_en} onChange={e => setProductForm((f:any) => ({...f, description_en: e.target.value}))}/></div>
                   <div className="field">
@@ -658,7 +702,7 @@ export default function AdminPage() {
                   <div className="field"><label style={{display:'flex',gap:8,alignItems:'center',marginTop:28}}><input type="checkbox" checked={!!productForm.is_published} onChange={e => setProductForm((f:any) => ({...f, is_published: e.target.checked}))}/>{t('نشر المنتج بالمتجر', 'Publish product')}</label></div>
                   <div className="field full" style={{display:'flex',gap:9}}>
                     <button className="btn btn-primary" type="submit" disabled={busy}><Save size={15}/>{t('حفظ المنتج', 'Save product')}</button>
-                    {editingProduct && <button className="btn btn-outline" type="button" onClick={() => { setEditingProduct(null); setProductForm({title_ar:'',title_en:'',slug:'',description_ar:'',description_en:'',price_jod:'0',stock_quantity:'0',category:'',is_published:false,image_path:''}); }}><X size={15}/>{t('إلغاء', 'Cancel')}</button>}
+                    {editingProduct && <button className="btn btn-outline" type="button" onClick={() => { setEditingProduct(null); setProductForm({title_ar:'',title_en:'',slug:'',description_ar:'',description_en:'',price_jod:'0',stock_quantity:'0',category:'',is_published:false,image_path:'', colors:'', sizes:''}); }}><X size={15}/>{t('إلغاء', 'Cancel')}</button>}
                   </div>
                 </form>
               </div>
@@ -670,7 +714,7 @@ export default function AdminPage() {
                       <div><strong>{p.title_en} / {p.title_ar}</strong><small>{money(p.price_jod)} · {t('المخزون', 'Stock')}: {p.stock_quantity} · {p.is_published ? 'Published' : 'Draft'}</small></div>
                     </div>
                     <div className="row-actions">
-                      <button className="btn btn-outline" onClick={() => { setEditingProduct(p.id); setProductForm({...p, price_jod: String(p.price_jod), stock_quantity: String(p.stock_quantity)}); }}><Edit3 size={13}/>{t('تعديل', 'Edit')}</button>
+                      <button className="btn btn-outline" onClick={() => { setEditingProduct(p.id); setProductForm({...p, price_jod: String(p.price_jod), stock_quantity: String(p.stock_quantity), colors: (p.colors || []).join(', '), sizes: (p.sizes || []).join(', ')}); }}><Edit3 size={13}/>{t('تعديل', 'Edit')}</button>
                       <button className="icon-button" onClick={() => void removeProduct(p.id)}><Trash2 size={14}/></button>
                     </div>
                   </div>
