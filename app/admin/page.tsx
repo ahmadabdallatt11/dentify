@@ -13,8 +13,8 @@ const tabs = [
   ['courses', 'Courses & lessons'],
   ['products', 'Store & Products'],
   ['assignments', 'Assignments'],
-  ['payments', 'New Payments'], // خليت هاد التبويب للمدفوعات المعلقة بس
-  ['orders', 'Orders & Tracking'], // التبويب الجديد للتتبع والفواتير
+  ['payments', 'New Payments'], 
+  ['orders', 'Orders & Tracking'], 
   ['brand', 'Site customizer']
 ];
 
@@ -60,11 +60,14 @@ export default function AdminPage() {
   
   const [courseForm, setCourseForm] = useState<any>({ title_ar: '', title_en: '', slug: '', description_ar: '', description_en: '', price_jod: '0', is_published: false, sort_order: 0, image_path: '', instructor_name: '', visibility: 'public', target_email: '' });
   const [lessonForm, setLessonForm] = useState<any>({ title_ar: '', title_en: '', description_ar: '', description_en: '', video_path: '', duration_seconds: 0, sort_order: 0, is_preview: false });
-  const [productForm, setProductForm] = useState<any>({ title_ar: '', title_en: '', slug: '', description_ar: '', description_en: '', price_jod: '0', stock_quantity: '0', category: '', is_published: false, image_path: '', colors: [], sizes: [] });
   
-  // مدخلات الألوان والأحجام الفردية
+  // أضفنا brands و types لتهيئة الفورم
+  const [productForm, setProductForm] = useState<any>({ title_ar: '', title_en: '', slug: '', description_ar: '', description_en: '', price_jod: '0', stock_quantity: '0', category: '', is_published: false, image_path: '', colors: [], sizes: [], brands: [], types: [] });
+  
   const [colorInput, setColorInput] = useState('');
   const [sizeInput, setSizeInput] = useState('');
+  const [brandInput, setBrandInput] = useState(''); 
+  const [typeInput, setTypeInput] = useState(''); 
 
   const [editingCourse, setEditingCourse] = useState<string | null>(null);
   const [editingLesson, setEditingLesson] = useState<string | null>(null);
@@ -275,7 +278,9 @@ export default function AdminPage() {
       is_published: !!productForm.is_published,
       image_path: productForm.image_path || null,
       colors: productForm.colors,
-      sizes: productForm.sizes
+      sizes: productForm.sizes,
+      brands: productForm.brands, // جديد
+      types: productForm.types // جديد
     };
     const sb = supabaseBrowser();
     const result = editingProduct
@@ -285,17 +290,24 @@ export default function AdminPage() {
     if (result.error) toast(result.error.message, 'error');
     else {
       toast(t('تم حفظ المنتج', 'Product saved'), 'success');
-      setProductForm({ title_ar: '', title_en: '', slug: '', description_ar: '', description_en: '', price_jod: '0', stock_quantity: '0', category: '', is_published: false, image_path: '', colors: [], sizes: [] });
+      setProductForm({ title_ar: '', title_en: '', slug: '', description_ar: '', description_en: '', price_jod: '0', stock_quantity: '0', category: '', is_published: false, image_path: '', colors: [], sizes: [], brands: [], types: [] });
       setEditingProduct(null);
       await load();
     }
   }
 
-  // دوال الألوان والأحجام
-  const addColor = () => { if(colorInput.trim() && !productForm.colors.includes(colorInput.trim())) { setProductForm({...productForm, colors: [...productForm.colors, colorInput.trim()]}); setColorInput(''); } };
-  const removeColor = (c: string) => setProductForm({...productForm, colors: productForm.colors.filter((x:string) => x !== c)});
-  const addSize = () => { if(sizeInput.trim() && !productForm.sizes.includes(sizeInput.trim())) { setProductForm({...productForm, sizes: [...productForm.sizes, sizeInput.trim()]}); setSizeInput(''); } };
-  const removeSize = (s: string) => setProductForm({...productForm, sizes: productForm.sizes.filter((x:string) => x !== s)});
+  // دوال الـ Tags للألوان والأحجام والشركات والأنواع
+  const addColor = () => { if(colorInput.trim() && !productForm.colors?.includes(colorInput.trim())) { setProductForm({...productForm, colors: [...(productForm.colors||[]), colorInput.trim()]}); setColorInput(''); } };
+  const removeColor = (c: string) => setProductForm({...productForm, colors: (productForm.colors||[]).filter((x:string) => x !== c)});
+  
+  const addSize = () => { if(sizeInput.trim() && !productForm.sizes?.includes(sizeInput.trim())) { setProductForm({...productForm, sizes: [...(productForm.sizes||[]), sizeInput.trim()]}); setSizeInput(''); } };
+  const removeSize = (s: string) => setProductForm({...productForm, sizes: (productForm.sizes||[]).filter((x:string) => x !== s)});
+
+  const addBrand = () => { if(brandInput.trim() && !productForm.brands?.includes(brandInput.trim())) { setProductForm({...productForm, brands: [...(productForm.brands||[]), brandInput.trim()]}); setBrandInput(''); } };
+  const removeBrand = (b: string) => setProductForm({...productForm, brands: (productForm.brands||[]).filter((x:string) => x !== b)});
+  
+  const addType = () => { if(typeInput.trim() && !productForm.types?.includes(typeInput.trim())) { setProductForm({...productForm, types: [...(productForm.types||[]), typeInput.trim()]}); setTypeInput(''); } };
+  const removeType = (t: string) => setProductForm({...productForm, types: (productForm.types||[]).filter((x:string) => x !== t)});
 
   async function uploadProductImage(file?: File) {
     if (!file) return;
@@ -485,7 +497,13 @@ export default function AdminPage() {
       <tr>
         <td>
           <strong style="font-size: 14px">${i.courses ? '🎓 ' + (i.courses.title_ar || i.courses.title_en) : i.products ? '📦 ' + (i.products.title_ar || i.products.title_en) : 'عنصر'}</strong>
-          ${i.selected_color || i.selected_size ? `<div style="font-size: 12px; color: #64748b; margin-top: 5px;">${i.selected_color ? `اللون: ${i.selected_color}` : ''} ${i.selected_size ? ` | المقاس: ${i.selected_size}` : ''}</div>` : ''}
+          ${i.selected_color || i.selected_size || i.selected_brand || i.selected_type ? `
+            <div style="font-size: 12px; color: #64748b; margin-top: 5px;">
+              ${i.selected_brand ? `الشركة: ${i.selected_brand} | ` : ''}
+              ${i.selected_type ? `النوع: ${i.selected_type} | ` : ''}
+              ${i.selected_color ? `اللون: ${i.selected_color} | ` : ''} 
+              ${i.selected_size ? `المقاس: ${i.selected_size}` : ''}
+            </div>` : ''}
         </td>
         <td style="text-align: center;">${i.quantity || 1}</td>
         <td style="text-align: center;">${i.price_jod} د.أ</td>
@@ -774,7 +792,7 @@ export default function AdminPage() {
 
           {tab === 'products' && (
             <>
-              <div className="section-head"><div><h2>{t('إدارة المتجر', 'Store management')}</h2></div><button className="btn btn-outline" onClick={() => { setEditingProduct(null); setProductForm({title_ar:'',title_en:'',slug:'',description_ar:'',description_en:'',price_jod:'0',stock_quantity:'0',category:'',is_published:false,image_path:'', colors:[], sizes:[]}); }}><Plus size={16}/>{t('منتج جديد', 'New product')}</button></div>
+              <div className="section-head"><div><h2>{t('إدارة المتجر', 'Store management')}</h2></div><button className="btn btn-outline" onClick={() => { setEditingProduct(null); setProductForm({title_ar:'',title_en:'',slug:'',description_ar:'',description_en:'',price_jod:'0',stock_quantity:'0',category:'',is_published:false,image_path:'', colors:[], sizes:[], brands:[], types:[]}); }}><Plus size={16}/>{t('منتج جديد', 'New product')}</button></div>
               <div className="panel">
                 <form className="admin-form" onSubmit={saveProduct}>
                   <div className="field"><label>{t('اسم المنتج بالعربية', 'Arabic title')} *</label><input required value={productForm.title_ar} onChange={e => setProductForm((f:any) => ({...f, title_ar: e.target.value, slug: f.slug || slugify(e.target.value)}))}/></div>
@@ -784,7 +802,37 @@ export default function AdminPage() {
                   <div className="field"><label>{t('الكمية (المخزون)', 'Stock')} *</label><input type="number" min="0" required value={productForm.stock_quantity} onChange={e => setProductForm((f:any) => ({...f, stock_quantity: e.target.value}))}/></div>
                   <div className="field"><label>{t('التصنيف', 'Category')}</label><input value={productForm.category || ''} onChange={e => setProductForm((f:any) => ({...f, category: e.target.value}))} placeholder="Tools, Kits, etc."/></div>
                   
-                  {/* الألوان بالـ Tags */}
+                  {/* نظام الـ Tags للألوان والمقاسات والشركات والأنواع */}
+                  <div className="field">
+                    <label>{t('الشركات المصنعة (Brands)', 'Available Brands')}</label>
+                    <div style={{display: 'flex', gap: 10}}>
+                      <input value={brandInput} onChange={e => setBrandInput(e.target.value)} placeholder="مثال: 3M, GC" style={{flex: 1}} onKeyDown={e => { if(e.key==='Enter') { e.preventDefault(); addBrand(); } }}/>
+                      <button type="button" className="btn btn-outline" onClick={addBrand}>{t('إضافة', 'Add')}</button>
+                    </div>
+                    <div style={{display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 10}}>
+                      {(productForm.brands || []).map((b: string) => (
+                        <span key={b} style={{background: 'var(--soft)', color: 'var(--primary)', padding: '5px 12px', borderRadius: 50, fontSize: 12, display: 'inline-flex', alignItems: 'center', gap: 5}}>
+                          {b} <X size={12} style={{cursor: 'pointer'}} onClick={() => removeBrand(b)} />
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="field">
+                    <label>{t('النوع أو الشكل', 'Type / Variant')}</label>
+                    <div style={{display: 'flex', gap: 10}}>
+                      <input value={typeInput} onChange={e => setTypeInput(e.target.value)} placeholder="مثال: خشن، ناعم" style={{flex: 1}} onKeyDown={e => { if(e.key==='Enter') { e.preventDefault(); addType(); } }}/>
+                      <button type="button" className="btn btn-outline" onClick={addType}>{t('إضافة', 'Add')}</button>
+                    </div>
+                    <div style={{display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 10}}>
+                      {(productForm.types || []).map((tType: string) => (
+                        <span key={tType} style={{background: 'var(--soft)', color: 'var(--primary)', padding: '5px 12px', borderRadius: 50, fontSize: 12, display: 'inline-flex', alignItems: 'center', gap: 5}}>
+                          {tType} <X size={12} style={{cursor: 'pointer'}} onClick={() => removeType(tType)} />
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+
                   <div className="field">
                     <label>{t('الألوان المتاحة', 'Available Colors')}</label>
                     <div style={{display: 'flex', gap: 10}}>
@@ -800,7 +848,6 @@ export default function AdminPage() {
                     </div>
                   </div>
 
-                  {/* المقاسات بالـ Tags */}
                   <div className="field">
                     <label>{t('المقاسات المتاحة', 'Available Sizes')}</label>
                     <div style={{display: 'flex', gap: 10}}>
@@ -826,7 +873,7 @@ export default function AdminPage() {
                   <div className="field"><label style={{display:'flex',gap:8,alignItems:'center',marginTop:28}}><input type="checkbox" checked={!!productForm.is_published} onChange={e => setProductForm((f:any) => ({...f, is_published: e.target.checked}))}/>{t('نشر المنتج بالمتجر', 'Publish product')}</label></div>
                   <div className="field full" style={{display:'flex',gap:9}}>
                     <button className="btn btn-primary" type="submit" disabled={busy}><Save size={15}/>{t('حفظ المنتج', 'Save product')}</button>
-                    {editingProduct && <button className="btn btn-outline" type="button" onClick={() => { setEditingProduct(null); setProductForm({title_ar:'',title_en:'',slug:'',description_ar:'',description_en:'',price_jod:'0',stock_quantity:'0',category:'',is_published:false,image_path:'', colors:[], sizes:[]}); }}><X size={15}/>{t('إلغاء', 'Cancel')}</button>}
+                    {editingProduct && <button className="btn btn-outline" type="button" onClick={() => { setEditingProduct(null); setProductForm({title_ar:'',title_en:'',slug:'',description_ar:'',description_en:'',price_jod:'0',stock_quantity:'0',category:'',is_published:false,image_path:'', colors:[], sizes:[], brands:[], types:[]}); }}><X size={15}/>{t('إلغاء', 'Cancel')}</button>}
                   </div>
                 </form>
               </div>
@@ -835,10 +882,10 @@ export default function AdminPage() {
                   <div className="admin-row" key={p.id}>
                     <div style={{display:'flex',alignItems:'center',gap:12,minWidth:0}}>
                       <div className="cart-thumb" style={{width:58,height:52,flexShrink:0}}>{p.image_path ? <img src={supabaseBrowser().storage.from('product-images').getPublicUrl(p.image_path).data.publicUrl} alt=""/> : <Package size={21}/>}</div>
-                      <div><strong>{p.title_en} / {p.title_ar}</strong><small>{money(p.price_jod)} · {t('المخزون', 'Stock')}: {p.stock_quantity} · {p.is_published ? 'Published' : 'Draft'}</small></div>
+                      <div><strong>{p.title_en} / {p.title_ar}</strong><small>{money(p.price_jod)} · {t('المخزون', 'Stock')}: {p.stock_quantity}</small></div>
                     </div>
                     <div className="row-actions">
-                      <button className="btn btn-outline" onClick={() => { setEditingProduct(p.id); setProductForm({...p, price_jod: String(p.price_jod), stock_quantity: String(p.stock_quantity), colors: p.colors || [], sizes: p.sizes || []}); }}><Edit3 size={13}/>{t('تعديل', 'Edit')}</button>
+                      <button className="btn btn-outline" onClick={() => { setEditingProduct(p.id); setProductForm({...p, price_jod: String(p.price_jod), stock_quantity: String(p.stock_quantity), colors: p.colors || [], sizes: p.sizes || [], brands: p.brands || [], types: p.types || []}); }}><Edit3 size={13}/>{t('تعديل', 'Edit')}</button>
                       <button className="icon-button" onClick={() => void removeProduct(p.id)}><Trash2 size={14}/></button>
                     </div>
                   </div>
@@ -847,6 +894,7 @@ export default function AdminPage() {
             </>
           )}
 
+          {/* التبويب لطلبات الواجبات */}
           {tab === 'assignments' && (
             <>
               <div className="section-head">
@@ -927,6 +975,7 @@ export default function AdminPage() {
             </>
           )}
 
+          {/* تبويب المدفوعات الجديدة (كليك) */}
           {tab === 'payments' && (
             <>
               <div className="section-head"><div><h2>{t('الطلبات المعلقة', 'New Payments')}</h2></div><button className="btn btn-outline" onClick={() => void load()}><Activity size={15}/>{t('تحديث', 'Refresh')}</button></div>
@@ -941,7 +990,7 @@ export default function AdminPage() {
                         <span className={`status status-${o.status}`}>{o.status}</span>
                       </div>
                       {o.proof_path && receiptUrls[o.id] && <a href={receiptUrls[o.id]} target="_blank" rel="noreferrer" style={{display:'inline-flex',alignItems:'center',gap:7,color:'var(--primary)',fontSize:12,fontWeight:800,marginTop:12}}><ImagePlus size={16}/>{t('عرض إشعار الدفع', 'View payment receipt')}</a>}
-                      {Array.isArray(o.cliq_order_items) && o.cliq_order_items.map((item: any) => <div key={item.id} style={{fontSize:11,color:'var(--muted)',marginTop:7}}>• {item.courses ? `🎓 ${item.courses.title_en}` : item.products ? `📦 ${item.products.title_en} (Qty: ${item.quantity})` : 'Item'} {item.selected_color || item.selected_size ? `(${item.selected_color || ''} ${item.selected_size || ''})` : ''} — {money(item.price_jod * item.quantity)}</div>)}
+                      {Array.isArray(o.cliq_order_items) && o.cliq_order_items.map((item: any) => <div key={item.id} style={{fontSize:11,color:'var(--muted)',marginTop:7}}>• {item.courses ? `🎓 ${item.courses.title_en}` : item.products ? `📦 ${item.products.title_en} (Qty: ${item.quantity})` : 'Item'} {item.selected_color || item.selected_size || item.selected_brand || item.selected_type ? `(${item.selected_brand||''} ${item.selected_type||''} ${item.selected_color||''} ${item.selected_size||''})` : ''} — {money(item.price_jod * item.quantity)}</div>)}
                       <div className="row-actions" style={{marginTop:15}}>
                         <button className="btn btn-primary" onClick={() => void reviewOrder(o, 'approved')}><Check size={15}/>{t('موافقة وتفعيل', 'Approve')}</button>
                         <button className="btn btn-outline" onClick={() => void reviewOrder(o, 'rejected')}><X size={15}/>{t('رفض', 'Reject')}</button>
