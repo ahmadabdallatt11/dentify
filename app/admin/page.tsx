@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
-import { Activity, BookOpen, Check, Download, Edit3, ImagePlus, LayoutDashboard, LoaderCircle, Palette, Plus, Save, Search, ShieldCheck, Trash2, UploadCloud, Users, Wallet, X, Store, Package, FileText, DownloadCloud, TrendingUp } from 'lucide-react';
+import { Activity, BookOpen, Check, Download, Edit3, ImagePlus, LayoutDashboard, LoaderCircle, Palette, Plus, Save, Search, ShieldCheck, Trash2, UploadCloud, Users, Wallet, X, Store, Package, FileText, DownloadCloud, TrendingUp, Truck, Printer } from 'lucide-react';
 import { supabaseBrowser } from '@/lib/supabase/client';
 import { money, publicImage, slugify } from '@/lib/utils';
 import { useApp } from '@/components/Providers';
@@ -13,7 +13,8 @@ const tabs = [
   ['courses', 'Courses & lessons'],
   ['products', 'Store & Products'],
   ['assignments', 'Assignments'],
-  ['payments', 'CliQ payments'],
+  ['payments', 'New Payments'], // خليت هاد التبويب للمدفوعات المعلقة بس
+  ['orders', 'Orders & Tracking'], // التبويب الجديد للتتبع والفواتير
   ['brand', 'Site customizer']
 ];
 
@@ -59,9 +60,12 @@ export default function AdminPage() {
   
   const [courseForm, setCourseForm] = useState<any>({ title_ar: '', title_en: '', slug: '', description_ar: '', description_en: '', price_jod: '0', is_published: false, sort_order: 0, image_path: '', instructor_name: '', visibility: 'public', target_email: '' });
   const [lessonForm, setLessonForm] = useState<any>({ title_ar: '', title_en: '', description_ar: '', description_en: '', video_path: '', duration_seconds: 0, sort_order: 0, is_preview: false });
-  // أضفنا colors و sizes للفورم
-  const [productForm, setProductForm] = useState<any>({ title_ar: '', title_en: '', slug: '', description_ar: '', description_en: '', price_jod: '0', stock_quantity: '0', category: '', is_published: false, image_path: '', colors: '', sizes: '' });
+  const [productForm, setProductForm] = useState<any>({ title_ar: '', title_en: '', slug: '', description_ar: '', description_en: '', price_jod: '0', stock_quantity: '0', category: '', is_published: false, image_path: '', colors: [], sizes: [] });
   
+  // مدخلات الألوان والأحجام الفردية
+  const [colorInput, setColorInput] = useState('');
+  const [sizeInput, setSizeInput] = useState('');
+
   const [editingCourse, setEditingCourse] = useState<string | null>(null);
   const [editingLesson, setEditingLesson] = useState<string | null>(null);
   const [editingProduct, setEditingProduct] = useState<string | null>(null);
@@ -259,7 +263,6 @@ export default function AdminPage() {
   async function saveProduct(e: React.FormEvent) {
     e.preventDefault();
     setBusy(true);
-    // تحويل النصوص المكتوبة (أزرق، أحمر) لمصفوفات جاهزة للحفظ بالداتا بيس
     const payload = {
       title_ar: productForm.title_ar,
       title_en: productForm.title_en,
@@ -271,8 +274,8 @@ export default function AdminPage() {
       category: productForm.category || null,
       is_published: !!productForm.is_published,
       image_path: productForm.image_path || null,
-      colors: productForm.colors ? productForm.colors.split(',').map((c:string) => c.trim()).filter(Boolean) : [],
-      sizes: productForm.sizes ? productForm.sizes.split(',').map((s:string) => s.trim()).filter(Boolean) : []
+      colors: productForm.colors,
+      sizes: productForm.sizes
     };
     const sb = supabaseBrowser();
     const result = editingProduct
@@ -282,11 +285,17 @@ export default function AdminPage() {
     if (result.error) toast(result.error.message, 'error');
     else {
       toast(t('تم حفظ المنتج', 'Product saved'), 'success');
-      setProductForm({ title_ar: '', title_en: '', slug: '', description_ar: '', description_en: '', price_jod: '0', stock_quantity: '0', category: '', is_published: false, image_path: '', colors: '', sizes: '' });
+      setProductForm({ title_ar: '', title_en: '', slug: '', description_ar: '', description_en: '', price_jod: '0', stock_quantity: '0', category: '', is_published: false, image_path: '', colors: [], sizes: [] });
       setEditingProduct(null);
       await load();
     }
   }
+
+  // دوال الألوان والأحجام
+  const addColor = () => { if(colorInput.trim() && !productForm.colors.includes(colorInput.trim())) { setProductForm({...productForm, colors: [...productForm.colors, colorInput.trim()]}); setColorInput(''); } };
+  const removeColor = (c: string) => setProductForm({...productForm, colors: productForm.colors.filter((x:string) => x !== c)});
+  const addSize = () => { if(sizeInput.trim() && !productForm.sizes.includes(sizeInput.trim())) { setProductForm({...productForm, sizes: [...productForm.sizes, sizeInput.trim()]}); setSizeInput(''); } };
+  const removeSize = (s: string) => setProductForm({...productForm, sizes: productForm.sizes.filter((x:string) => x !== s)});
 
   async function uploadProductImage(file?: File) {
     if (!file) return;
@@ -460,6 +469,102 @@ export default function AdminPage() {
     }
   }
 
+  // تحديث حالة الطلب
+  async function updateOrderStatus(id: string, newStatus: string) {
+    const { error } = await supabaseBrowser().from('cliq_orders').update({ status: newStatus }).eq('id', id);
+    if (error) toast(error.message, 'error');
+    else { toast(t('تم تحديث حالة الطلب', 'Order status updated'), 'success'); await load(); }
+  }
+
+  // طباعة الفاتورة PDF
+  function printInvoice(order: any) {
+    const win = window.open('', '_blank');
+    if(!win) return;
+    
+    const itemsHtml = order.cliq_order_items.map((i:any) => `
+      <tr>
+        <td>
+          <strong style="font-size: 14px">${i.courses ? '🎓 ' + (i.courses.title_ar || i.courses.title_en) : i.products ? '📦 ' + (i.products.title_ar || i.products.title_en) : 'عنصر'}</strong>
+          ${i.selected_color || i.selected_size ? `<div style="font-size: 12px; color: #64748b; margin-top: 5px;">${i.selected_color ? `اللون: ${i.selected_color}` : ''} ${i.selected_size ? ` | المقاس: ${i.selected_size}` : ''}</div>` : ''}
+        </td>
+        <td style="text-align: center;">${i.quantity || 1}</td>
+        <td style="text-align: center;">${i.price_jod} د.أ</td>
+        <td style="text-align: center; font-weight: bold;">${(i.price_jod * (i.quantity || 1)).toFixed(2)} د.أ</td>
+      </tr>
+    `).join('');
+
+    win.document.write(`
+      <html dir="rtl" lang="ar">
+        <head>
+          <title>فاتورة رقم ${order.id}</title>
+          <style>
+            body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; padding: 40px; color: #1e293b; direction: rtl; }
+            .invoice-box { max-width: 800px; margin: auto; padding: 30px; border: 1px solid #e2e8f0; border-radius: 12px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); }
+            .header { text-align: center; margin-bottom: 40px; border-bottom: 2px solid #0f766e; padding-bottom: 20px; }
+            .header h1 { color: #0f766e; margin: 0; font-size: 32px; }
+            .info-box { background: #f8fafc; padding: 20px; border-radius: 8px; margin-bottom: 20px; line-height: 1.8; font-size: 15px; }
+            table { width: 100%; border-collapse: collapse; margin-top: 20px; font-size: 14px; }
+            th, td { border: 1px solid #cbd5e1; padding: 12px; }
+            th { background: #f1f5f9; color: #334155; text-align: center; font-weight: bold; }
+            .totals { margin-top: 30px; text-align: left; background: #f8fafc; padding: 20px; border-radius: 8px; }
+            .total-line { font-size: 16px; margin-bottom: 10px; color: #475569; }
+            .grand-total { font-size: 24px; font-weight: bold; color: #0f766e; border-top: 2px dashed #cbd5e1; padding-top: 15px; margin-top: 10px; }
+            .btn-print { display: block; margin: 30px auto 0; padding: 12px 25px; background: #0f766e; color: white; border: none; border-radius: 8px; cursor: pointer; font-size: 16px; font-weight: bold; box-shadow: 0 4px 6px rgba(15,118,110,0.2); }
+            .btn-print:hover { background: #115e59; }
+            @media print { .invoice-box { border: none; box-shadow: none; padding: 0; } .btn-print { display: none; } body { padding: 0; background: white; } }
+          </style>
+        </head>
+        <body>
+          <div class="invoice-box">
+            <div class="header">
+              <h1>${settings.brand_name || 'Dentify'}</h1>
+              <p style="color: #64748b; font-size: 14px; margin-top: 5px;">فاتورة طلب إلكتروني | Official Invoice</p>
+            </div>
+            
+            <div class="info-box">
+              <div style="display: flex; justify-content: space-between;">
+                <div>
+                  <p style="margin: 5px 0;"><strong>اسم العميل:</strong> ${order.profiles?.full_name || order.profiles?.email || 'طالب'}</p>
+                  <p style="margin: 5px 0;"><strong>رقم الطلب (Ref):</strong> #${order.id.slice(0,8).toUpperCase()}</p>
+                  <p style="margin: 5px 0;"><strong>تاريخ الطلب:</strong> ${new Date(order.created_at).toLocaleString('ar-JO')}</p>
+                </div>
+                <div style="text-align: left;">
+                  <p style="margin: 5px 0;"><strong>طريقة الدفع:</strong> ${order.payment_method === 'cod' ? 'الدفع عند الاستلام (كاش)' : 'حوالة بنكية مؤكدة (CliQ)'}</p>
+                  <p style="margin: 5px 0; color: #0f766e; font-weight: bold;">الحالة: ${order.status === 'approved' ? 'مؤكد' : order.status === 'shipped' ? 'قيد التوصيل' : 'مكتمل'}</p>
+                </div>
+              </div>
+              <div style="margin-top: 15px; padding-top: 15px; border-top: 1px solid #e2e8f0;">
+                <p style="margin: 5px 0;"><strong>العنوان والتواصل:</strong> ${order.delivery_address || 'توصيل غير مطلوب'}</p>
+              </div>
+            </div>
+            
+            <table>
+              <thead>
+                <tr>
+                  <th style="text-align: right;">وصف العنصر (Item)</th>
+                  <th>الكمية (Qty)</th>
+                  <th>السعر الإفرادي</th>
+                  <th>المجموع (Subtotal)</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${itemsHtml}
+              </tbody>
+            </table>
+            
+            <div class="totals">
+              ${order.delivery_fee ? `<div class="total-line">رسوم التوصيل: ${order.delivery_fee} د.أ</div>` : ''}
+              <div class="grand-total">الإجمالي المستحق: ${order.amount_jod} د.أ</div>
+            </div>
+            
+            <button class="btn-print" onclick="window.print()">🖨️ طباعة أو حفظ كـ PDF</button>
+          </div>
+        </body>
+      </html>
+    `);
+    win.document.close();
+  }
+
   if (authLoading) return <div className="container loading-page"><div className="spinner"/></div>;
   if (!user || profile?.role !== 'admin') return <div className="container section"><div className="empty-state"><ShieldCheck size={32}/><h3>{t('هذه الصفحة مخصصة للإدارة', 'Admin access only')}</h3><Link className="btn btn-outline" href="/">{t('العودة للرئيسية', 'Back home')}</Link></div></div>;
 
@@ -475,11 +580,11 @@ export default function AdminPage() {
         <aside className="admin-side">
           {tabs.map(([id, label]) => (
             <button key={id} className={tab === id ? 'active' : ''} onClick={() => setTab(id)}>
-              {id === 'overview' ? <LayoutDashboard size={16}/> : id === 'users' ? <Users size={16}/> : id === 'courses' ? <BookOpen size={16}/> : id === 'products' ? <Store size={16}/> : id === 'assignments' ? <FileText size={16}/> : id === 'payments' ? <Wallet size={16}/> : <Palette size={16}/>}
-              <span>{t(({overview:'نظرة عامة', users:'المستخدمون', courses:'الكورسات والدروس', products:'المتجر والمنتجات', assignments:'طلبات الواجبات', payments:'مدفوعات CliQ', brand:'تخصيص الموقع'} as any)[id], label)}</span>
-              {id === 'assignments' && assignments.filter(a => a.status === 'pending' || a.status === 'paid').length > 0 && (
+              {id === 'overview' ? <LayoutDashboard size={16}/> : id === 'users' ? <Users size={16}/> : id === 'courses' ? <BookOpen size={16}/> : id === 'products' ? <Store size={16}/> : id === 'assignments' ? <FileText size={16}/> : id === 'payments' ? <Wallet size={16}/> : id === 'orders' ? <Truck size={16}/> : <Palette size={16}/>}
+              <span>{t(({overview:'نظرة عامة', users:'المستخدمون', courses:'الكورسات والدروس', products:'المتجر والمنتجات', assignments:'طلبات الواجبات', payments:'طلبات جديدة', orders:'تتبع الفواتير والطلبات', brand:'تخصيص الموقع'} as any)[id], label)}</span>
+              {id === 'payments' && orders.filter(o => o.status === 'pending').length > 0 && (
                 <span style={{background: '#ef4444', color: '#fff', borderRadius: '50px', padding: '2px 6px', fontSize: '0.7rem', marginLeft: 'auto', fontWeight: 'bold'}}>
-                  {assignments.filter(a => a.status === 'pending' || a.status === 'paid').length}
+                  {orders.filter(o => o.status === 'pending').length}
                 </span>
               )}
             </button>
@@ -669,27 +774,46 @@ export default function AdminPage() {
 
           {tab === 'products' && (
             <>
-              <div className="section-head"><div><h2>{t('إدارة المتجر', 'Store management')}</h2></div><button className="btn btn-outline" onClick={() => { setEditingProduct(null); setProductForm({title_ar:'',title_en:'',slug:'',description_ar:'',description_en:'',price_jod:'0',stock_quantity:'0',category:'',is_published:false,image_path:'', colors:'', sizes:''}); }}><Plus size={16}/>{t('منتج جديد', 'New product')}</button></div>
+              <div className="section-head"><div><h2>{t('إدارة المتجر', 'Store management')}</h2></div><button className="btn btn-outline" onClick={() => { setEditingProduct(null); setProductForm({title_ar:'',title_en:'',slug:'',description_ar:'',description_en:'',price_jod:'0',stock_quantity:'0',category:'',is_published:false,image_path:'', colors:[], sizes:[]}); }}><Plus size={16}/>{t('منتج جديد', 'New product')}</button></div>
               <div className="panel">
-                <h3 style={{marginTop:0}}>{editingProduct ? t('تعديل المنتج', 'Edit product') : t('بيانات المنتج', 'Product details')}</h3>
                 <form className="admin-form" onSubmit={saveProduct}>
                   <div className="field"><label>{t('اسم المنتج بالعربية', 'Arabic title')} *</label><input required value={productForm.title_ar} onChange={e => setProductForm((f:any) => ({...f, title_ar: e.target.value, slug: f.slug || slugify(e.target.value)}))}/></div>
                   <div className="field"><label>{t('اسم المنتج بالإنجليزية', 'English title')} *</label><input required value={productForm.title_en} onChange={e => setProductForm((f:any) => ({...f, title_en: e.target.value, slug: f.slug || slugify(e.target.value)}))}/></div>
                   <div className="field"><label>Slug</label><input required value={productForm.slug} onChange={e => setProductForm((f:any) => ({...f, slug: slugify(e.target.value)}))}/></div>
-                  <div className="field"><label>{t('التصنيف', 'Category')}</label><input value={productForm.category || ''} onChange={e => setProductForm((f:any) => ({...f, category: e.target.value}))} placeholder="Tools, Kits, etc."/></div>
                   <div className="field"><label>{t('السعر بالدينار', 'Price in JOD')} *</label><input type="number" min="0" step="0.01" required value={productForm.price_jod} onChange={e => setProductForm((f:any) => ({...f, price_jod: e.target.value}))}/></div>
                   <div className="field"><label>{t('الكمية (المخزون)', 'Stock')} *</label><input type="number" min="0" required value={productForm.stock_quantity} onChange={e => setProductForm((f:any) => ({...f, stock_quantity: e.target.value}))}/></div>
+                  <div className="field"><label>{t('التصنيف', 'Category')}</label><input value={productForm.category || ''} onChange={e => setProductForm((f:any) => ({...f, category: e.target.value}))} placeholder="Tools, Kits, etc."/></div>
                   
-                  {/* الخانات الجديدة للألوان والمقاسات */}
+                  {/* الألوان بالـ Tags */}
                   <div className="field">
-                    <label>{t('الألوان المتاحة (مفصولة بفاصلة)', 'Available Colors (comma separated)')}</label>
-                    <input value={productForm.colors || ''} onChange={e => setProductForm((f:any) => ({...f, colors: e.target.value}))} placeholder="أزرق, أحمر, أخضر" />
-                    <small style={{color: 'var(--muted)', fontSize: 10}}>{t('اتركه فارغاً إذا لم يوجد', 'Leave empty if none')}</small>
+                    <label>{t('الألوان المتاحة', 'Available Colors')}</label>
+                    <div style={{display: 'flex', gap: 10}}>
+                      <input value={colorInput} onChange={e => setColorInput(e.target.value)} placeholder="مثال: أزرق" style={{flex: 1}} onKeyDown={e => { if(e.key==='Enter') { e.preventDefault(); addColor(); } }}/>
+                      <button type="button" className="btn btn-outline" onClick={addColor}>{t('إضافة', 'Add')}</button>
+                    </div>
+                    <div style={{display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 10}}>
+                      {(productForm.colors || []).map((c: string) => (
+                        <span key={c} style={{background: 'var(--soft)', color: 'var(--primary)', padding: '5px 12px', borderRadius: 50, fontSize: 12, display: 'inline-flex', alignItems: 'center', gap: 5}}>
+                          {c} <X size={12} style={{cursor: 'pointer'}} onClick={() => removeColor(c)} />
+                        </span>
+                      ))}
+                    </div>
                   </div>
+
+                  {/* المقاسات بالـ Tags */}
                   <div className="field">
-                    <label>{t('المقاسات المتاحة (مفصولة بفاصلة)', 'Available Sizes (comma separated)')}</label>
-                    <input value={productForm.sizes || ''} onChange={e => setProductForm((f:any) => ({...f, sizes: e.target.value}))} placeholder="S, M, L, XL" />
-                    <small style={{color: 'var(--muted)', fontSize: 10}}>{t('اتركه فارغاً إذا لم يوجد', 'Leave empty if none')}</small>
+                    <label>{t('المقاسات المتاحة', 'Available Sizes')}</label>
+                    <div style={{display: 'flex', gap: 10}}>
+                      <input value={sizeInput} onChange={e => setSizeInput(e.target.value)} placeholder="مثال: XL" style={{flex: 1}} onKeyDown={e => { if(e.key==='Enter') { e.preventDefault(); addSize(); } }}/>
+                      <button type="button" className="btn btn-outline" onClick={addSize}>{t('إضافة', 'Add')}</button>
+                    </div>
+                    <div style={{display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 10}}>
+                      {(productForm.sizes || []).map((s: string) => (
+                        <span key={s} style={{background: 'var(--soft)', color: 'var(--primary)', padding: '5px 12px', borderRadius: 50, fontSize: 12, display: 'inline-flex', alignItems: 'center', gap: 5}}>
+                          {s} <X size={12} style={{cursor: 'pointer'}} onClick={() => removeSize(s)} />
+                        </span>
+                      ))}
+                    </div>
                   </div>
 
                   <div className="field full"><label>{t('الوصف بالعربية', 'Arabic description')}</label><textarea value={productForm.description_ar} onChange={e => setProductForm((f:any) => ({...f, description_ar: e.target.value}))}/></div>
@@ -702,7 +826,7 @@ export default function AdminPage() {
                   <div className="field"><label style={{display:'flex',gap:8,alignItems:'center',marginTop:28}}><input type="checkbox" checked={!!productForm.is_published} onChange={e => setProductForm((f:any) => ({...f, is_published: e.target.checked}))}/>{t('نشر المنتج بالمتجر', 'Publish product')}</label></div>
                   <div className="field full" style={{display:'flex',gap:9}}>
                     <button className="btn btn-primary" type="submit" disabled={busy}><Save size={15}/>{t('حفظ المنتج', 'Save product')}</button>
-                    {editingProduct && <button className="btn btn-outline" type="button" onClick={() => { setEditingProduct(null); setProductForm({title_ar:'',title_en:'',slug:'',description_ar:'',description_en:'',price_jod:'0',stock_quantity:'0',category:'',is_published:false,image_path:'', colors:'', sizes:''}); }}><X size={15}/>{t('إلغاء', 'Cancel')}</button>}
+                    {editingProduct && <button className="btn btn-outline" type="button" onClick={() => { setEditingProduct(null); setProductForm({title_ar:'',title_en:'',slug:'',description_ar:'',description_en:'',price_jod:'0',stock_quantity:'0',category:'',is_published:false,image_path:'', colors:[], sizes:[]}); }}><X size={15}/>{t('إلغاء', 'Cancel')}</button>}
                   </div>
                 </form>
               </div>
@@ -714,7 +838,7 @@ export default function AdminPage() {
                       <div><strong>{p.title_en} / {p.title_ar}</strong><small>{money(p.price_jod)} · {t('المخزون', 'Stock')}: {p.stock_quantity} · {p.is_published ? 'Published' : 'Draft'}</small></div>
                     </div>
                     <div className="row-actions">
-                      <button className="btn btn-outline" onClick={() => { setEditingProduct(p.id); setProductForm({...p, price_jod: String(p.price_jod), stock_quantity: String(p.stock_quantity), colors: (p.colors || []).join(', '), sizes: (p.sizes || []).join(', ')}); }}><Edit3 size={13}/>{t('تعديل', 'Edit')}</button>
+                      <button className="btn btn-outline" onClick={() => { setEditingProduct(p.id); setProductForm({...p, price_jod: String(p.price_jod), stock_quantity: String(p.stock_quantity), colors: p.colors || [], sizes: p.sizes || []}); }}><Edit3 size={13}/>{t('تعديل', 'Edit')}</button>
                       <button className="icon-button" onClick={() => void removeProduct(p.id)}><Trash2 size={14}/></button>
                     </div>
                   </div>
@@ -805,26 +929,80 @@ export default function AdminPage() {
 
           {tab === 'payments' && (
             <>
-              <div className="section-head"><div><h2>{t('طلبات CliQ', 'CliQ payment orders')}</h2></div><button className="btn btn-outline" onClick={() => void load()}><Activity size={15}/>{t('تحديث', 'Refresh')}</button></div>
-              {orders.length === 0 ? (
-                <div className="empty-state"><Wallet size={30}/><h3>{t('لا توجد طلبات دفع', 'No payment orders')}</h3></div>
+              <div className="section-head"><div><h2>{t('الطلبات المعلقة', 'New Payments')}</h2></div><button className="btn btn-outline" onClick={() => void load()}><Activity size={15}/>{t('تحديث', 'Refresh')}</button></div>
+              {orders.filter(o => o.status === 'pending').length === 0 ? (
+                <div className="empty-state"><Wallet size={30}/><h3>{t('لا توجد طلبات معلقة', 'No pending orders')}</h3></div>
               ) : (
                 <div className="admin-list">
-                  {orders.map(o => (
+                  {orders.filter(o => o.status === 'pending').map(o => (
                     <div className="panel" key={o.id}>
                       <div style={{display:'flex',justifyContent:'space-between',alignItems:'start',gap:12,flexWrap:'wrap'}}>
                         <div><strong style={{fontSize:15}}>{o.profiles?.full_name || o.profiles?.email || o.user_id}</strong><p style={{fontSize:11,color:'var(--muted)',margin:'5px 0'}}>Ref: {o.transfer_reference || '—'} · {new Date(o.created_at).toLocaleString()}</p><strong style={{fontSize:22}}>{money(o.amount_jod)}</strong></div>
                         <span className={`status status-${o.status}`}>{o.status}</span>
                       </div>
                       {o.proof_path && receiptUrls[o.id] && <a href={receiptUrls[o.id]} target="_blank" rel="noreferrer" style={{display:'inline-flex',alignItems:'center',gap:7,color:'var(--primary)',fontSize:12,fontWeight:800,marginTop:12}}><ImagePlus size={16}/>{t('عرض إشعار الدفع', 'View payment receipt')}</a>}
-                      {Array.isArray(o.cliq_order_items) && o.cliq_order_items.map((item: any) => <div key={item.id} style={{fontSize:11,color:'var(--muted)',marginTop:7}}>• {item.courses ? `🎓 ${item.courses.title_en}` : item.products ? `📦 ${item.products.title_en} (Qty: ${item.quantity})` : 'Item'} — {money(item.price_jod * item.quantity)}</div>)}
-                      {o.admin_note && <p style={{fontSize:11,color:'var(--muted)'}}>{t('ملاحظة الإدارة', 'Admin note')}: {o.admin_note}</p>}
-                      {o.status === 'pending' && (
-                        <div className="row-actions" style={{marginTop:15}}>
-                          <button className="btn btn-primary" onClick={() => void reviewOrder(o, 'approved')}><Check size={15}/>{t('موافقة وتفعيل', 'Approve & enroll')}</button>
-                          <button className="btn btn-outline" onClick={() => void reviewOrder(o, 'rejected')}><X size={15}/>{t('رفض', 'Reject')}</button>
+                      {Array.isArray(o.cliq_order_items) && o.cliq_order_items.map((item: any) => <div key={item.id} style={{fontSize:11,color:'var(--muted)',marginTop:7}}>• {item.courses ? `🎓 ${item.courses.title_en}` : item.products ? `📦 ${item.products.title_en} (Qty: ${item.quantity})` : 'Item'} {item.selected_color || item.selected_size ? `(${item.selected_color || ''} ${item.selected_size || ''})` : ''} — {money(item.price_jod * item.quantity)}</div>)}
+                      <div className="row-actions" style={{marginTop:15}}>
+                        <button className="btn btn-primary" onClick={() => void reviewOrder(o, 'approved')}><Check size={15}/>{t('موافقة وتفعيل', 'Approve')}</button>
+                        <button className="btn btn-outline" onClick={() => void reviewOrder(o, 'rejected')}><X size={15}/>{t('رفض', 'Reject')}</button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </>
+          )}
+
+          {/* التبويب الجديد للطلبات المقبولة والفواتير */}
+          {tab === 'orders' && (
+            <>
+              <div className="section-head">
+                <div><h2>{t('متابعة الطلبات والفواتير', 'Orders & Tracking')}</h2><p>{t('إصدار الفواتير وتحديث حالة الشحن للطلبات المعتمدة.', 'Print invoices and update shipping status for approved orders.')}</p></div>
+                <button className="btn btn-outline" onClick={() => void load()}><Activity size={15}/>{t('تحديث', 'Refresh')}</button>
+              </div>
+              {orders.filter(o => o.status !== 'pending').length === 0 ? (
+                <div className="empty-state"><Truck size={30}/><h3>{t('لا توجد طلبات معتمدة', 'No approved orders')}</h3></div>
+              ) : (
+                <div className="admin-list">
+                  {orders.filter(o => o.status !== 'pending').map(o => (
+                    <div className="panel" key={o.id} style={{ display: 'grid', gap: 15 }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: 10 }}>
+                        <div>
+                          <strong style={{ fontSize: 16 }}>{o.profiles?.full_name || o.profiles?.email || 'طالب'}</strong>
+                          <p style={{ fontSize: 12, color: 'var(--muted)', margin: '5px 0' }}>Ref: #{o.id.slice(0,8)} · {new Date(o.created_at).toLocaleString()}</p>
+                          <strong style={{ fontSize: 20, color: 'var(--primary)' }}>{money(o.amount_jod)}</strong>
                         </div>
-                      )}
+                        <div style={{ textAlign: 'end' }}>
+                          <span className={`status status-${o.status === 'rejected' ? 'inactive' : 'active'}`} style={{ marginBottom: 10 }}>
+                            {o.payment_method === 'cod' ? 'الدفع كاش (COD)' : 'حوالة كليك'}
+                          </span>
+                        </div>
+                      </div>
+                      
+                      <div style={{ background: '#f8fafc', padding: 12, borderRadius: 10, fontSize: 12, lineHeight: 1.6 }}>
+                        <strong style={{ display: 'block', marginBottom: 5 }}>العنوان والتواصل:</strong>
+                        {o.delivery_address || 'توصيل غير مطلوب'}
+                      </div>
+
+                      <div className="row-actions" style={{ borderTop: '1px solid var(--line)', paddingTop: 15, marginTop: 5 }}>
+                        <select 
+                          className="search-input" 
+                          style={{ width: 'auto', padding: '8px 15px', fontWeight: 'bold', color: o.status === 'delivered' ? 'green' : 'var(--secondary)' }} 
+                          value={o.status} 
+                          onChange={async e => {
+                            const { error } = await supabaseBrowser().from('cliq_orders').update({ status: e.target.value }).eq('id', o.id);
+                            if (error) toast(error.message, 'error'); else load();
+                          }}
+                        >
+                          <option value="approved">{t('قيد التجهيز', 'Processing')}</option>
+                          <option value="shipped">{t('تم الشحن / مع المندوب', 'Shipped')}</option>
+                          <option value="delivered">{t('تم التوصيل بنجاح', 'Delivered')}</option>
+                          <option value="rejected">{t('طلب ملغي / مرفوض', 'Cancelled')}</option>
+                        </select>
+                        <button className="btn btn-primary" onClick={() => printInvoice(o)} style={{ marginLeft: 'auto' }}>
+                          <Printer size={15} /> {t('فاتورة PDF', 'Invoice PDF')}
+                        </button>
+                      </div>
                     </div>
                   ))}
                 </div>
