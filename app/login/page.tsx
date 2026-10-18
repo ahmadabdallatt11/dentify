@@ -2,11 +2,10 @@
 
 import { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { ShieldCheck, Mail, Lock, LoaderCircle } from 'lucide-react';
+import { ShieldCheck, Mail, Lock, LoaderCircle, User, Phone, GraduationCap } from 'lucide-react';
 import { supabaseBrowser } from '@/lib/supabase/client';
 import { useApp } from '@/components/Providers';
 
-// فصلنا الكود جوا كمبوننت داخلي عشان فيرسل يرضى يغلفه
 function LoginContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -18,7 +17,13 @@ function LoginContent() {
   const [mode, setMode] = useState<'login' | 'signup' | 'recovery'>(initMode);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  
+  // الحقول الإجبارية
   const [fullName, setFullName] = useState('');
+  const [phone, setPhone] = useState('');
+  const [university, setUniversity] = useState('');
+  const [academicYear, setAcademicYear] = useState('first');
+  
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
@@ -31,13 +36,29 @@ function LoginContent() {
     const sb = supabaseBrowser();
 
     if (mode === 'signup') {
-      const { error } = await sb.auth.signUp({
+      const { data, error } = await sb.auth.signUp({
         email,
         password,
-        options: { data: { full_name: fullName } }
+        options: { 
+          data: { 
+            full_name: fullName,
+            phone: phone,
+            university: university,
+            academic_year: academicYear
+          } 
+        }
       });
-      if (error) toast(error.message, 'error');
-      else {
+
+      if (error) {
+        toast(error.message, 'error');
+      } else {
+        if (data?.user?.id) {
+          await sb.from('profiles').update({
+            phone: phone,
+            university: university,
+            academic_year: academicYear
+          }).eq('id', data.user.id);
+        }
         toast(t('تم إنشاء الحساب بنجاح', 'Account created successfully'), 'success');
         router.refresh();
       }
@@ -66,7 +87,7 @@ function LoginContent() {
 
   return (
     <div className="container form-page">
-      <div className="auth-card">
+      <div className="auth-card" style={{ maxWidth: mode === 'signup' ? '700px' : '500px', transition: 'all 0.3s' }}>
         <div style={{textAlign: 'center', marginBottom: '30px'}}>
           <ShieldCheck size={45} color="var(--primary)" style={{margin: '0 auto 15px'}}/>
           <h1>
@@ -81,11 +102,64 @@ function LoginContent() {
           </p>
         </div>
 
-        <form onSubmit={handleSubmit} style={{display: 'flex', flexDirection: 'column', gap: '20px'}}>
+        <form onSubmit={handleSubmit} style={{display: 'flex', flexDirection: 'column', gap: '18px'}}>
+          
           {mode === 'signup' && (
-            <div className="field">
-              <label>{t('الاسم الكامل', 'Full Name')} *</label>
-              <input required value={fullName} onChange={e => setFullName(e.target.value)} placeholder={t('د. أحمد عبدالله...', 'Dr. Ahmed...')} />
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '18px', background: 'var(--soft)', padding: 20, borderRadius: 16, marginBottom: 10 }}>
+              <div className="field">
+                <label>{t('الاسم الكامل', 'Full Name')} *</label>
+                <div style={{position: 'relative'}}>
+                  <User size={18} color="var(--muted)" style={{position: 'absolute', top: '14px', [lang==='ar'?'right':'left']: '14px'}}/>
+                  <input required value={fullName} onChange={e => setFullName(e.target.value)} placeholder={t('مثال: د. أحمد عبدالله', 'e.g. Dr. Ahmed...')} style={{paddingInlineStart: '40px', background: '#fff'}} />
+                </div>
+              </div>
+
+              <div className="field">
+                <label>{t('رقم الهاتف', 'Phone Number')} *</label>
+                <div style={{position: 'relative'}}>
+                  <Phone size={18} color="var(--muted)" style={{position: 'absolute', top: '14px', [lang==='ar'?'right':'left']: '14px'}}/>
+                  <input type="tel" required value={phone} onChange={e => setPhone(e.target.value)} placeholder="079XXXXXXX" style={{paddingInlineStart: '40px', background: '#fff'}} dir="ltr" />
+                </div>
+              </div>
+
+              {/* قائمة الجامعات המعتمدة في الأردن */}
+              <div className="field">
+                <label>{t('الجامعة', 'University')} *</label>
+                <div style={{position: 'relative'}}>
+                  <GraduationCap size={18} color="var(--muted)" style={{position: 'absolute', top: '14px', [lang==='ar'?'right':'left']: '14px'}}/>
+                  <select required value={university} onChange={e => setUniversity(e.target.value)} style={{background: '#fff', padding: '13px', paddingInlineStart: '40px', borderRadius: '11px', border: '1px solid #dce3e8', outline: 'none', width: '100%', appearance: 'none'}}>
+                    <option value="" disabled>{t('اختر جامعتك...', 'Select your university...')}</option>
+                    <optgroup label="الجامعات الحكومية">
+                      <option value="الجامعة الأردنية">الجامعة الأردنية</option>
+                      <option value="جامعة العلوم والتكنولوجيا الأردنية">جامعة العلوم والتكنولوجيا الأردنية</option>
+                      <option value="الجامعة الهاشمية">الجامعة الهاشمية</option>
+                      <option value="جامعة مؤتة">جامعة مؤتة</option>
+                    </optgroup>
+                    <optgroup label="الجامعات الخاصة">
+                      <option value="جامعة البترا">جامعة البترا</option>
+                      <option value="جامعة عمان الأهلية">جامعة عمان الأهلية</option>
+                      <option value="جامعة الزرقاء">جامعة الزرقاء</option>
+                      <option value="جامعة العلوم التطبيقية الخاصة">جامعة العلوم التطبيقية الخاصة</option>
+                      <option value="جامعة ابن سينا للعلوم الطبية">جامعة ابن سينا للعلوم الطبية</option>
+                      <option value="جامعة العقبة للعلوم الطبية">جامعة العقبة للعلوم الطبية</option>
+                    </optgroup>
+                    <option value="جامعة خارج الأردن / أخرى">جامعة خارج الأردن / أخرى</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="field">
+                <label>{t('السنة الدراسية', 'Academic Year')} *</label>
+                <select required value={academicYear} onChange={e => setAcademicYear(e.target.value)} style={{background: '#fff', padding: '13px', borderRadius: '11px', border: '1px solid #dce3e8', outline: 'none'}}>
+                  <option value="first">{t('سنة أولى', 'First year')}</option>
+                  <option value="second">{t('سنة ثانية', 'Second year')}</option>
+                  <option value="third">{t('سنة ثالثة', 'Third year')}</option>
+                  <option value="fourth">{t('سنة رابعة', 'Fourth year')}</option>
+                  <option value="fifth">{t('سنة خامسة', 'Fifth year')}</option>
+                  <option value="graduate">{t('خريج / طبيب امتياز', 'Graduate / Intern')}</option>
+                  <option value="other">{t('أخرى', 'Other')}</option>
+                </select>
+              </div>
             </div>
           )}
           
@@ -133,7 +207,6 @@ function LoginContent() {
   );
 }
 
-// هاي الصفحة الرئيسية اللي غلفنا فيها الكود بـ Suspense
 export default function LoginPage() {
   return (
     <Suspense fallback={<div className="loading-page"><div className="spinner" /></div>}>
